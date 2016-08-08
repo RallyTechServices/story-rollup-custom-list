@@ -8,8 +8,8 @@ Ext.override(Rally.data.wsapi.TreeStore,{
 
         Ext.Array.each(models, function(m){
             if (m.typePath === "hierarchicalrequirement"){
-                m.addField({name: 'PercentDoneByStoryCount', type: 'auto', defaultValue: null});
-                m.addField({name: 'PercentDoneByStoryPlanEstimate', type: 'auto', defaultValue: null});
+                m.addField({name: 'PercentDoneByStoryCount', type: 'auto', defaultValue: null, modelType: 'hierarchicalrequirement'});
+                m.addField({name: 'PercentDoneByStoryPlanEstimate', type: 'auto', defaultValue: null, modelType: 'hierarchicalrequirement'});
             }
             m.addField({name: 'Teams', type: 'auto', defaultValue: null});
         });
@@ -64,4 +64,75 @@ Ext.override(Rally.ui.grid.TreeGrid, {
         }
 
     }
+});
+
+Ext.override(Rally.ui.renderer.RendererFactory, {
+    getRenderTemplate: _.memoize(function(field) {
+        var modelType = field.modelType;
+        console.log('modelType',field.name, modelType,this.typeFieldTemplates[modelType])
+
+        var fieldName = field.name.toLowerCase();
+        var fieldType = field.getType();
+        if(this.typeFieldTemplates[modelType] && this.typeFieldTemplates[modelType][fieldName]) {
+            console.log('inside typefieldtemplates')
+            return this.typeFieldTemplates[modelType][fieldName](field);
+        } else if (field.isMultiValueCustom && field.isMultiValueCustom()) {
+            return this.typeTemplates.multivalue(field);
+        } else if (this.fieldTemplates[field.name.toLowerCase()]) {
+            return this.fieldTemplates[field.name.toLowerCase()](field);
+        } else if (this.typeTemplates[fieldType]) {
+            return this.typeTemplates[fieldType](field);
+        } else {
+            return this.defaultRenderer(field);
+        }
+    }, function(field) {
+        var modelType = field.modelType;
+        var fieldName = field.name.toLowerCase();
+        var fieldType = field.getType();
+
+        return modelType + fieldName + fieldType;
+    }),
+    typeFieldTemplates: {
+        defectsuite: {
+            state: function(field) {
+                return Ext.create('Rally.ui.renderer.template.DefectSuiteStateTemplate', {
+                    field: field
+                });
+            }
+        },
+        milestone: {
+            formattedid: function(field) {
+                return Ext.create('Rally.ui.renderer.template.FormattedIDTemplate');
+            }
+        },
+        task: {
+            state: function(field) {
+                return Ext.create('Rally.ui.renderer.template.ScheduleStateTemplate', {
+                    field: field,
+                    showTrigger: true
+                });
+            }
+        },
+        testcase: {
+            lastbuild: function(field) {
+                return Ext.create('Rally.ui.renderer.template.LastBuildTemplate');
+            }
+        },
+        recyclebinentry: {
+            type: function(field) {
+                return Ext.create('Rally.ui.renderer.template.TypeDefNameTemplate', {
+                    fieldName: field.name
+                });
+            }
+        },
+        hierarchicalrequirement: {
+            percentdonebystorycount: function(field){
+                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountTemplate');
+            },
+            percentdonebystoryplanestimate: function(field){
+                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEstimateTemplate');
+            }
+        }
+    }
+
 });
