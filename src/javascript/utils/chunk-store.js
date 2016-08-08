@@ -67,7 +67,8 @@ Ext.define('CArABU.technicalservices.chunk.Store',{
         Ext.create(this.storeType,{
             fetch: fetch,
             filters: filters,
-            model: model
+            model: model,
+            context: {project: null}
         }).load({
             callback: function(records, operation, success){
                 if (success){

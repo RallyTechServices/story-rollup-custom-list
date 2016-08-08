@@ -14,7 +14,7 @@ Ext.define("story-rollup-custom-list", {
 
     config: {
         defaultSettings: {
-            query: ""
+            queryFilter: ""
         }
     },
 
@@ -26,7 +26,7 @@ Ext.define("story-rollup-custom-list", {
             failure: this.showErrorNotification,
             scope: this
         });
-       
+
     },
     initializeCompletedScheduleStates: function(firstCompletedState){
         var deferred = Ext.create('Deft.Deferred');
@@ -75,7 +75,7 @@ Ext.define("story-rollup-custom-list", {
         return this.down('#grid_box');
     },
     getInitialFilters: function(){
-        var query = this.getSetting('query');
+        var query = this.getSetting('queryFilter');
         if (query && query.length > 0){
             var filters = Rally.data.wsapi.Filter.fromQueryString(query);
             return filters;
@@ -86,6 +86,7 @@ Ext.define("story-rollup-custom-list", {
         var piType = piSelector.getRecord() && piSelector.getRecord().get('TypePath');
         this.logger.log('updateView', piType);
 
+        this.childHash = {};
         this.getGridBox().removeAll();
 
         if (!piType){
@@ -95,6 +96,7 @@ Ext.define("story-rollup-custom-list", {
         this.modelNames = [piType];
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: this.modelNames,
+            fetch: [this.getFeatureName(),'ScheduleState','PlanEstimate'],
             enableHierarchy: true,
             filters: this.getInitialFilters()
         }).then({
@@ -103,10 +105,15 @@ Ext.define("story-rollup-custom-list", {
         });
 
     },
+    getFeatureName: function(){
+        return 'Feature';
+    },
     updateAssociatedData: function(store, node, records, success){
         this.logger.log('updateAssociatedData', store, node, records, success);
         var updateableRecords = [],
-            featureOids = [];
+            featureOids = [],
+            featureName = this.getFeatureName(),
+            subLevelRecords = [];
 
         Ext.Array.each(records, function(r){
             if (r.get('PortfolioItem')){
@@ -114,14 +121,17 @@ Ext.define("story-rollup-custom-list", {
                 if (!Ext.Array.contains(featureOids,r.get('PortfolioItem').ObjectID )){
                     featureOids.push(r.get('PortfolioItem').ObjectID);
                 }
+            } else if (r.get(featureName)){
+                subLevelRecords.push(r);
             }
         });
-        this.logger.log('updateAssociatedData', updateableRecords, featureOids);
+        this.logger.log('updateAssociatedData', subLevelRecords, updateableRecords, featureOids);
 
         if (updateableRecords.length > 0){
             Ext.create('CArABU.technicalservices.chunk.Store',{
                 storeConfig: {
                     model: 'HierarchicalRequirement',
+                    context: { project: null },
                     fetch: ['PlanEstimate','ScheduleState','PortfolioItem','Parent','ObjectID','Project','Name'],
                     filters: {
                         property: 'Parent.ObjectID',
@@ -129,8 +139,8 @@ Ext.define("story-rollup-custom-list", {
                         value: 0
                     }
                 },
-                chunkProperty: 'Feature.ObjectID',
-                chunkValue: featureOids,
+                chunkProperty: featureName + '.ObjectID',
+                chunkValue: featureOids
             }).load().then({
                 success: function(children){
                     this.processChildren(updateableRecords, children);
@@ -140,6 +150,27 @@ Ext.define("story-rollup-custom-list", {
             });
         }
 
+        if (subLevelRecords.length > 0){
+           this.updateAdditionalFields(subLevelRecords, this.childHash || {});
+        }
+
+    },
+    updateAdditionalFields: function(records, childHash){
+        this.logger.log('updateAdditionalFields',records, childHash);
+        for (var i=0; i< records.length; i++){
+            var r = records[i],
+                totals = this.getChildTotals(r, childHash);
+
+            var percentDoneByStoryCount = totals.totalCount > 0 ? totals.totalAcceptedCount/totals.totalCount : 0,
+                percentDoneByPlanEstimate = totals.totalPlanEstimate > 0 ? totals.totalAcceptedPlanEstimate/totals.totalPlanEstimate : 0;
+
+            this.logger.log('updateAdditionalFields results', percentDoneByPlanEstimate,percentDoneByStoryCount,totals.projects);
+
+            r.set('PercentDoneByStoryCount',percentDoneByStoryCount);
+            r.set('PercentDoneByStoryPlanEstimate',percentDoneByPlanEstimate);
+            r.set('Teams', totals.projects);
+        }
+
     },
     processChildren: function(topLevelStoryRecords, childRecords){
         this.logger.log('processChildren', childRecords)
@@ -147,8 +178,7 @@ Ext.define("story-rollup-custom-list", {
             return;
         }
 
-        var childHash = {},
-            acceptedScheduleStates = this.acceptedScheduleStates;
+        var childHash = this.childHash || {};
         for (var i=0; i<childRecords.length; i++){
             var child = childRecords[i].getData(),
                 parent = (child.PortfolioItem && child.PortfolioItem.ObjectID) ||
@@ -161,26 +191,17 @@ Ext.define("story-rollup-custom-list", {
                 childHash[parent].push(child);
             }
         }
+        this.childHash = childHash;
 
         this.logger.log('processChildren', childHash, topLevelStoryRecords);
 
-        for (var i=0; i< topLevelStoryRecords.length; i++){
-            var epic = topLevelStoryRecords[i],
-                totals = this.getChildTotals(epic.get('ObjectID'), childHash, acceptedScheduleStates);
-
-            var percentDoneByStoryCount = totals.totalCount > 0 ? totals.totalAcceptedCount/totals.totalCount : null,
-                percentDoneByPlanEstimate = totals.totalPlanEstimate > 0 ? totals.totalAcceptedPlanEstimate/totals.totalPlanEstimate : null;
-
-            this.logger.log('percent', percentDoneByPlanEstimate,percentDoneByStoryCount,totals.projects);
-
-            epic.set('PercentDoneByStoryCount',percentDoneByStoryCount);
-            epic.set('PercentDoneByStoryPlanEstimate',percentDoneByPlanEstimate);
-            epic.set('Teams', totals.projects);
-        }
+        this.updateAdditionalFields(topLevelStoryRecords,childHash);
 
     },
-    getChildTotals: function(oid, childHash, acceptedScheduleStates){
-        this.logger.log('getChildTotals', oid, childHash, acceptedScheduleStates);
+    getChildTotals: function(record, childHash){
+        this.logger.log('getChildTotals', record, childHash);
+        var oid = record.ObjectID || record.get('ObjectID');
+        var acceptedScheduleStates = this.acceptedScheduleStates;
         var children = childHash[oid] || [],
             totalPlanEstimate = 0,
             totalAcceptedPlanEstimate = 0,
@@ -188,30 +209,48 @@ Ext.define("story-rollup-custom-list", {
             totalAcceptedCount = 0,
             projects = [];
 
-        Ext.Array.each(children, function(c){
-            var totals = {};
+        if (children.length > 0) {
+            Ext.Array.each(children, function (c) {
+                var totals = {};
+                if (!c.ObjectID){
+                    c = c.getData();
+                }
 
-            if (childHash[c.ObjectID]){
-                totals = this.getChildTotals(c.ObjectID, childHash, acceptedScheduleStates);
-            } else {
-                var isAccepted = Ext.Array.contains(acceptedScheduleStates, c.ScheduleState),
-                    acceptedPlanEstimate = isAccepted && c.PlanEstimate || 0,
-                    acceptedTotal = isAccepted && 1 || 0;
-                totals = {
-                    totalPlanEstimate: c.PlanEstimate,
-                    totalAcceptedPlanEstimate: acceptedPlanEstimate,
-                    totalCount: 1,
-                    totalAcceptedCount: acceptedTotal,
-                    projects: [c.Project && c.Project.Name]
-                };
-            }
-            totalPlanEstimate += totals.totalPlanEstimate;
-            totalAcceptedPlanEstimate += totals.totalAcceptedPlanEstimate;
-            totalCount += totals.totalCount;
-            totalAcceptedCount += totals.totalAcceptedCount;
-            projects = projects.concat(totals.projects);
+                if (childHash[c.ObjectID]) {
+                    totals = this.getChildTotals(c, childHash, acceptedScheduleStates);
+                } else {
+                    var isAccepted = Ext.Array.contains(acceptedScheduleStates, c.ScheduleState),
+                        acceptedPlanEstimate = isAccepted && c.PlanEstimate || 0,
+                        acceptedTotal = isAccepted && 1 || 0;
+                    totals = {
+                        totalPlanEstimate: c.PlanEstimate || 0,
+                        totalAcceptedPlanEstimate: acceptedPlanEstimate,
+                        totalCount: 1,
+                        totalAcceptedCount: acceptedTotal,
+                        projects: [c.Project && c.Project.Name]
+                    };
+                }
+                totalPlanEstimate += totals.totalPlanEstimate;
+                totalAcceptedPlanEstimate += totals.totalAcceptedPlanEstimate;
+                totalCount += totals.totalCount;
+                totalAcceptedCount += totals.totalAcceptedCount;
+                projects = projects.concat(totals.projects);
 
-        }, this);
+            }, this);
+        } else {
+            var recordData = record.ObjectID ? record : record.getData(),
+                isAccepted = Ext.Array.contains(acceptedScheduleStates, recordData.ScheduleState),
+                acceptedPlanEstimate = isAccepted && recordData.PlanEstimate || 0,
+                acceptedTotal = isAccepted && 1 || 0;
+
+            totalPlanEstimate = recordData.PlanEstimate || 0;
+            totalAcceptedPlanEstimate = acceptedPlanEstimate;
+                totalCount = 1;
+            totalAcceptedCount = acceptedTotal;
+            projects = [recordData.Project && recordData.Project.Name]
+        }
+
+
         return {
             totalPlanEstimate: totalPlanEstimate,
             totalAcceptedPlanEstimate: totalAcceptedPlanEstimate,
@@ -227,8 +266,9 @@ Ext.define("story-rollup-custom-list", {
         var modelNames = this.modelNames,
             context = this.getContext();
 
+        this.getGridBox().removeAll();
         store.on('load', this.updateAssociatedData, this);
-        this.add({
+        this.getGridBox().add({
             xtype: 'rallygridboard',
             context: context,
             modelNames: modelNames,
@@ -278,6 +318,9 @@ Ext.define("story-rollup-custom-list", {
             ],
             gridConfig: {
                 store: store,
+                storeConfig: {
+                    filters: this.getInitialFilters()
+                },
                 columnCfgs: this.getDefaultColumns(),
                 derivedColumns: this.getAdditionalColumns()
             },
@@ -325,5 +368,36 @@ Ext.define("story-rollup-custom-list", {
         this.logger.log('onSettingsUpdate',settings);
         // Ext.apply(this, settings);
         this.launch();
+    },
+    getSettingsFields: function(){
+        return [{
+            xtype: 'textarea',
+            fieldLabel: 'Query',
+            name: 'queryFilter',
+            anchor: '100%',
+            cls: 'query-field',
+            margin: '0 70 0 0',
+            labelAlign: 'right',
+            labelWidth: 100,
+            plugins: [
+                {
+                    ptype: 'rallyhelpfield',
+                    helpId: 194
+                },
+                'rallyfieldvalidationui'
+            ],
+            validateOnBlur: false,
+            validateOnChange: false,
+            validator: function(value) {
+                try {
+                    if (value) {
+                        Rally.data.wsapi.Filter.fromQueryString(value);
+                    }
+                    return true;
+                } catch (e) {
+                    return e.message;
+                }
+            }
+        }];
     }
 });
