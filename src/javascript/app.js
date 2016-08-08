@@ -14,7 +14,8 @@ Ext.define("story-rollup-custom-list", {
 
     config: {
         defaultSettings: {
-            queryFilter: ""
+            queryFilter: "",
+            tfsLinkField: "c_TFSLink"
         }
     },
 
@@ -74,6 +75,9 @@ Ext.define("story-rollup-custom-list", {
     getGridBox: function() {
         return this.down('#grid_box');
     },
+    getTFSTeamPrefix: function(){
+        return "TFS: ";
+    },
     getInitialFilters: function(){
         var query = this.getSetting('queryFilter');
         if (query && query.length > 0){
@@ -81,6 +85,9 @@ Ext.define("story-rollup-custom-list", {
             return filters;
         }
         return [];
+    },
+    getTFSLinkField: function(){
+        return this.getSetting('tfsLinkField');
     },
     updateView: function(piSelector){
         var piType = piSelector.getRecord() && piSelector.getRecord().get('TypePath');
@@ -96,7 +103,7 @@ Ext.define("story-rollup-custom-list", {
         this.modelNames = [piType];
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: this.modelNames,
-            fetch: [this.getFeatureName(),'ScheduleState','PlanEstimate'],
+            fetch: [this.getFeatureName(),'ScheduleState','PlanEstimate', this.getTFSLinkField()],
             enableHierarchy: true,
             filters: this.getInitialFilters()
         }).then({
@@ -132,7 +139,7 @@ Ext.define("story-rollup-custom-list", {
                 storeConfig: {
                     model: 'HierarchicalRequirement',
                     context: { project: null },
-                    fetch: ['PlanEstimate','ScheduleState','PortfolioItem','Parent','ObjectID','Project','Name'],
+                    fetch: ['PlanEstimate','ScheduleState','PortfolioItem','Parent','ObjectID','Project','Name',this.getTFSLinkField()],
                     filters: {
                         property: 'Parent.ObjectID',
                         operator: '>',
@@ -175,6 +182,7 @@ Ext.define("story-rollup-custom-list", {
     processChildren: function(topLevelStoryRecords, childRecords){
         this.logger.log('processChildren', childRecords)
         if (!childRecords || childRecords.length == 0){
+            this.updateAdditionalFields(topLevelStoryRecords,this.childHash || {});
             return;
         }
 
@@ -207,7 +215,9 @@ Ext.define("story-rollup-custom-list", {
             totalAcceptedPlanEstimate = 0,
             totalCount = 0,
             totalAcceptedCount = 0,
-            projects = [];
+            projects = [],
+            tfsLinkField = this.getTFSLinkField(),
+            tfsPrefix = this.getTFSTeamPrefix();
 
         if (children.length > 0) {
             Ext.Array.each(children, function (c) {
@@ -221,13 +231,19 @@ Ext.define("story-rollup-custom-list", {
                 } else {
                     var isAccepted = Ext.Array.contains(acceptedScheduleStates, c.ScheduleState),
                         acceptedPlanEstimate = isAccepted && c.PlanEstimate || 0,
-                        acceptedTotal = isAccepted && 1 || 0;
+                        acceptedTotal = isAccepted && 1 || 0,
+                        isTFS = c[tfsLinkField],
+                        projectName = c.Project && c.Project.Name;
+
+                    if (isTFS){
+                        projectName = tfsPrefix + projectName;
+                    }
                     totals = {
                         totalPlanEstimate: c.PlanEstimate || 0,
                         totalAcceptedPlanEstimate: acceptedPlanEstimate,
                         totalCount: 1,
                         totalAcceptedCount: acceptedTotal,
-                        projects: [c.Project && c.Project.Name]
+                        projects: [projectName]
                     };
                 }
                 totalPlanEstimate += totals.totalPlanEstimate;
@@ -245,7 +261,7 @@ Ext.define("story-rollup-custom-list", {
 
             totalPlanEstimate = recordData.PlanEstimate || 0;
             totalAcceptedPlanEstimate = acceptedPlanEstimate;
-                totalCount = 1;
+            totalCount = 1;
             totalAcceptedCount = acceptedTotal;
             projects = [recordData.Project && recordData.Project.Name]
         }
@@ -371,6 +387,21 @@ Ext.define("story-rollup-custom-list", {
     },
     getSettingsFields: function(){
         return [{
+            xtype: 'rallyfieldcombobox',
+            model: 'hierarchicalrequirement',
+            name: 'tfsLinkField',
+            fieldLabel: "TFS Link Field",
+            labelAlign: 'right',
+            labelWidth: 100,
+            _isNotHidden: function(field){
+
+                if (!field.readOnly && field.attributeDefinition && (field.attributeDefinition.AttributeType === 'STRING' ||
+                        field.attributeDefinition.AttributeType === 'TEXT')){
+                    return true;
+                }
+                return false;
+            }
+        },{
             xtype: 'textarea',
             fieldLabel: 'Query',
             name: 'queryFilter',

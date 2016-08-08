@@ -67,31 +67,7 @@ Ext.override(Rally.ui.grid.TreeGrid, {
 });
 
 Ext.override(Rally.ui.renderer.RendererFactory, {
-    getRenderTemplate: _.memoize(function(field) {
-        var modelType = field.modelType;
-        console.log('modelType',field.name, modelType,this.typeFieldTemplates[modelType])
 
-        var fieldName = field.name.toLowerCase();
-        var fieldType = field.getType();
-        if(this.typeFieldTemplates[modelType] && this.typeFieldTemplates[modelType][fieldName]) {
-            console.log('inside typefieldtemplates')
-            return this.typeFieldTemplates[modelType][fieldName](field);
-        } else if (field.isMultiValueCustom && field.isMultiValueCustom()) {
-            return this.typeTemplates.multivalue(field);
-        } else if (this.fieldTemplates[field.name.toLowerCase()]) {
-            return this.fieldTemplates[field.name.toLowerCase()](field);
-        } else if (this.typeTemplates[fieldType]) {
-            return this.typeTemplates[fieldType](field);
-        } else {
-            return this.defaultRenderer(field);
-        }
-    }, function(field) {
-        var modelType = field.modelType;
-        var fieldName = field.name.toLowerCase();
-        var fieldType = field.getType();
-
-        return modelType + fieldName + fieldType;
-    }),
     typeFieldTemplates: {
         defectsuite: {
             state: function(field) {
@@ -127,10 +103,16 @@ Ext.override(Rally.ui.renderer.RendererFactory, {
         },
         hierarchicalrequirement: {
             percentdonebystorycount: function(field){
-                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountTemplate');
+                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountTemplate',{
+                    startDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField,
+                    endDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyEndDateField
+                });
             },
             percentdonebystoryplanestimate: function(field){
-                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEstimateTemplate');
+                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEstimateTemplate',{
+                    startDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField,
+                    endDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyEndDateField
+                });
             }
         }
     }
