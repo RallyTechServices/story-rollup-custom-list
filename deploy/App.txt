@@ -3,12 +3,12 @@
 <head>
     <title>Story Rollup Custom List</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Aug 09 2016 16:38:35 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Aug 09 2016 16:42:16 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Aug 09 2016 16:38:35 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Aug 09 2016 16:42:16 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 39001434574;
+        var CHECKSUM = 33062903390;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -393,88 +393,16 @@ Ext.override(Rally.ui.renderer.RendererFactory, {
         },
         hierarchicalrequirement: {
             percentdonebystorycount: function(field){
-                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountTemplate',{
-                    startDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField,
-                    endDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyEndDateField
-                });
+                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountTemplate');
             },
             percentdonebystoryplanestimate: function(field){
-                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEstimateTemplate',{
-                    startDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField,
-                    endDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyEndDateField
-                });
+                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEstimateTemplate');
             }
         }
     }
 
 });
 
-Ext.override(Rally.ui.popover.PopoverFactory,{
-    popovers: {
-        Discussion: function(config) {
-            return Ext.create('Rally.ui.popover.DiscussionPopover', this._getConfig(config));
-        },
-
-        UserStory: function(config) {
-            return Ext.create('Rally.ui.popover.UserStoryPopover', this._getConfig(config));
-        },
-
-        Task: function(config){
-            return Ext.create('Rally.ui.popover.TaskPopover', this._getConfig(config));
-        },
-
-        Defect: function(config) {
-            if (config.type === 'testset' || (config.record && config.record.isTestSet())) {
-                return Ext.create('Rally.ui.popover.TestCaseDefectPopover', this._getConfig(config));
-            } else {
-                return Ext.create('Rally.ui.popover.DefectPopover', this._getConfig(config));
-            }
-        },
-
-        TestCase: function(config){
-            return Ext.create('Rally.ui.popover.TestCasePopover', this._getConfig(config));
-        },
-
-        Description: function(config) {
-            return Ext.create('Rally.ui.popover.DescriptionPopover', this._getConfig(config));
-        },
-
-        Owner: function(config){
-            return Ext.create('Rally.ui.popover.OwnerPopover', this._getConfig(config));
-        },
-
-        Color: function(config){
-            return Ext.create('Rally.ui.popover.ColorPopover', this._getConfig(config));
-        },
-
-        PercentDoneByStoryCount: function (config) {
-            console.log('popover',config);
-            return Ext.create('Rally.ui.popover.PercentDonePopover', this._getConfig(config));
-        },
-
-        PercentDoneByStoryPlanEstimate: function (config) {
-            console.log('popover',config);
-            return Ext.create('Rally.ui.popover.PercentDonePopover', this._getConfig(config));
-        },
-
-        PredecessorsAndSuccessors: function(config) {
-            return Ext.create('Rally.ui.popover.DependenciesPopover', this._getConfig(config));
-        },
-
-        WorkProduct: function (config) {
-            return Ext.create('Rally.ui.popover.WorkProductPopover', this._getConfig(config));
-        },
-
-        _getConfig: function(config) {
-            return Ext.merge({
-                context: {
-                    workspace: config.record.get('Workspace')._ref,
-                    project: null
-                }
-            }, config);
-        }
-    }
-});
 Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneTemplate', {
     requires: [
         'Rally.util.HealthColorCalculator'
@@ -566,7 +494,6 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountT
          */
         showDangerNotificationFn: function (recordData) {
             var summary = recordData._summary || {};
-            console.log('sumary', summary, recordData.FormattedID);
             return !summary.endDate || !summary.startDate;
         }
     }
@@ -600,8 +527,7 @@ Ext.override(Rally.ui.popover.PercentDonePopover, {
                 if (config.percentDoneData.PortfolioItem){
                     plannedEndDate = summaryData.endDate;
                     plannedStartDate = summaryData.startDate;
-                    console.log('c',config.percentDoneData.FormattedID, summaryData, config.percentDoneData);
-                }
+                 }
 
                 config.percentDoneData.AcceptedLeafStoryCount = summaryData.totalAcceptedCount;
                 config.percentDoneData.AcceptedLeafStoryPlanEstimateTotal = summaryData.totalAcceptedPlanEstimate;
@@ -615,7 +541,6 @@ Ext.override(Rally.ui.popover.PercentDonePopover, {
                 config.percentDoneData.UnEstimatedLeafStoryCount = summaryData.unestimatedLeafStories;
             }
 
-            console.log('popoveroverrides', config);
             this.id += Ext.Date.now().toString();
             if (!Ext.getElementById(this.id)) {
                 this.initConfig(config);

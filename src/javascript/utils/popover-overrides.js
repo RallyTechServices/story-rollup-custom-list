@@ -27,8 +27,7 @@ Ext.override(Rally.ui.popover.PercentDonePopover, {
                 if (config.percentDoneData.PortfolioItem){
                     plannedEndDate = summaryData.endDate;
                     plannedStartDate = summaryData.startDate;
-                    console.log('c',config.percentDoneData.FormattedID, summaryData, config.percentDoneData);
-                }
+                 }
 
                 config.percentDoneData.AcceptedLeafStoryCount = summaryData.totalAcceptedCount;
                 config.percentDoneData.AcceptedLeafStoryPlanEstimateTotal = summaryData.totalAcceptedPlanEstimate;
@@ -42,7 +41,6 @@ Ext.override(Rally.ui.popover.PercentDonePopover, {
                 config.percentDoneData.UnEstimatedLeafStoryCount = summaryData.unestimatedLeafStories;
             }
 
-            console.log('popoveroverrides', config);
             this.id += Ext.Date.now().toString();
             if (!Ext.getElementById(this.id)) {
                 this.initConfig(config);

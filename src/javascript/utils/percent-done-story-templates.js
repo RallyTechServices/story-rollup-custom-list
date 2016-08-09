@@ -89,7 +89,6 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountT
          */
         showDangerNotificationFn: function (recordData) {
             var summary = recordData._summary || {};
-            console.log('sumary', summary, recordData.FormattedID);
             return !summary.endDate || !summary.startDate;
         }
     }
