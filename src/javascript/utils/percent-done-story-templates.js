@@ -5,11 +5,32 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneTemplate', {
     extend: 'Rally.ui.renderer.template.progressbar.ProgressBarTemplate',
 
     config: {
+        /**
+         * @cfg {String}
+         * define a height if necessary to fit where it's being used
+         */
+        height:'15px',
+
         calculateColorFn: function(recordData) {
-            var colorObject = Rally.util.HealthColorCalculator.calculateHealthColorForPortfolioItemData(recordData, this.percentDoneName);
-            return colorObject.hex;
+            var today = new Date();
+            var config = {
+                percentComplete: recordData[this.percentDoneName],
+                startDate: recordData[this.startDateField] || today,
+                endDate: recordData[this.endDateField] || today,
+                asOfDate: today
+            };
+
+            config.inProgress = config.percentComplete > 0;
+            return Rally.util.HealthColorCalculator.calculateHealthColor(config).hex;
         },
-        isClickable: true
+
+        isClickable: true,
+        /**
+         * @cfg {Boolean}
+         * If the percent done is 0%, do not show the bar at all
+         */
+        showOnlyIfInProgress: false
+
     },
 
     constructor: function(config) {
@@ -28,35 +49,23 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEs
     config: {
         /**
          * @cfg {String}
-         * define a height if necessary to fit where it's being used
-         */
-        height:'15px',
-        /**
-         * @cfg {String}
          * sometimes it's necessary to name the variable used as the percent done replacement in the template,
          * like in a grid when a record is used to render the template.
          */
         percentDoneName: 'PercentDoneByStoryPlanEstimate',
+
         /**
          * @cfg {Function}
          * A function that should return true to show a triangle in the top right to denote something is missing.
          * Defaults to:
          *      function(){ return false; }
          */
-        showDangerNotificationFn:function (recordData) {
-            return !recordData.PlanEstimate;  //(!recordData.PlannedEndDate && !recordData.ActualEndDate) || recordData.UnEstimatedLeafStoryCount > 0;
-        },
+        showDangerNotificationFn: function (recordData) {
+            var summary = recordData._summary || {};
 
-        /**
-         * @cfg {Boolean}
-         * If the percent done is 0%, do not show the bar at all
-         */
-        showOnlyIfInProgress: false
-    },
-
-    constructor: function(config) {
-        this.initConfig(config);
-        return this.callParent(arguments);
+            return !summary.endDate || !summary.startDate ||
+                summary.unestimatedLeafStories > 0;
+        }
     }
 });
 
@@ -65,11 +74,7 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountT
     extend: 'Rally.ui.renderer.template.progressbar.StoryPercentDoneTemplate',
 
     config: {
-        /**
-         * @cfg {String}
-         * define a height if necessary to fit where it's being used
-         */
-        height:'15px',
+
         /**
          * @cfg {String}
          * sometimes it's necessary to name the variable used as the percent done replacement in the template,
@@ -83,19 +88,9 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountT
          *      function(){ return false; }
          */
         showDangerNotificationFn: function (recordData) {
-            return !this.startDateField || !recordData[this.startDateField] ||
-                !this.endDateField || !recordData[this.endDateField];
-        },
-
-        /**
-         * @cfg {Boolean}
-         * If the percent done is 0%, do not show the bar at all
-         */
-        showOnlyIfInProgress: false
-    },
-
-    constructor: function(config) {
-        this.initConfig(config);
-        return this.callParent(arguments);
+            var summary = recordData._summary || {};
+            console.log('sumary', summary, recordData.FormattedID);
+            return !summary.endDate || !summary.startDate;
+        }
     }
 });

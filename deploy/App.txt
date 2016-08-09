@@ -3,12 +3,12 @@
 <head>
     <title>Story Rollup Custom List</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 08 2016 14:02:55 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Aug 09 2016 16:38:35 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 08 2016 14:02:55 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Aug 09 2016 16:38:35 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 69263260899;
+        var CHECKSUM = 39001434574;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -205,7 +205,7 @@ Ext.define('Rally.technicalservices.Logger',{
 
 Ext.define('CArABU.technicalservices.chunk.Store',{
 
-    MAX_CHUNK_SIZE: 25,
+    MAX_CHUNK_SIZE: 50,
     logger: new Rally.technicalservices.Logger(),
 
     constructor: function(config) {
@@ -408,6 +408,73 @@ Ext.override(Rally.ui.renderer.RendererFactory, {
     }
 
 });
+
+Ext.override(Rally.ui.popover.PopoverFactory,{
+    popovers: {
+        Discussion: function(config) {
+            return Ext.create('Rally.ui.popover.DiscussionPopover', this._getConfig(config));
+        },
+
+        UserStory: function(config) {
+            return Ext.create('Rally.ui.popover.UserStoryPopover', this._getConfig(config));
+        },
+
+        Task: function(config){
+            return Ext.create('Rally.ui.popover.TaskPopover', this._getConfig(config));
+        },
+
+        Defect: function(config) {
+            if (config.type === 'testset' || (config.record && config.record.isTestSet())) {
+                return Ext.create('Rally.ui.popover.TestCaseDefectPopover', this._getConfig(config));
+            } else {
+                return Ext.create('Rally.ui.popover.DefectPopover', this._getConfig(config));
+            }
+        },
+
+        TestCase: function(config){
+            return Ext.create('Rally.ui.popover.TestCasePopover', this._getConfig(config));
+        },
+
+        Description: function(config) {
+            return Ext.create('Rally.ui.popover.DescriptionPopover', this._getConfig(config));
+        },
+
+        Owner: function(config){
+            return Ext.create('Rally.ui.popover.OwnerPopover', this._getConfig(config));
+        },
+
+        Color: function(config){
+            return Ext.create('Rally.ui.popover.ColorPopover', this._getConfig(config));
+        },
+
+        PercentDoneByStoryCount: function (config) {
+            console.log('popover',config);
+            return Ext.create('Rally.ui.popover.PercentDonePopover', this._getConfig(config));
+        },
+
+        PercentDoneByStoryPlanEstimate: function (config) {
+            console.log('popover',config);
+            return Ext.create('Rally.ui.popover.PercentDonePopover', this._getConfig(config));
+        },
+
+        PredecessorsAndSuccessors: function(config) {
+            return Ext.create('Rally.ui.popover.DependenciesPopover', this._getConfig(config));
+        },
+
+        WorkProduct: function (config) {
+            return Ext.create('Rally.ui.popover.WorkProductPopover', this._getConfig(config));
+        },
+
+        _getConfig: function(config) {
+            return Ext.merge({
+                context: {
+                    workspace: config.record.get('Workspace')._ref,
+                    project: null
+                }
+            }, config);
+        }
+    }
+});
 Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneTemplate', {
     requires: [
         'Rally.util.HealthColorCalculator'
@@ -415,11 +482,32 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneTemplate', {
     extend: 'Rally.ui.renderer.template.progressbar.ProgressBarTemplate',
 
     config: {
+        /**
+         * @cfg {String}
+         * define a height if necessary to fit where it's being used
+         */
+        height:'15px',
+
         calculateColorFn: function(recordData) {
-            var colorObject = Rally.util.HealthColorCalculator.calculateHealthColorForPortfolioItemData(recordData, this.percentDoneName);
-            return colorObject.hex;
+            var today = new Date();
+            var config = {
+                percentComplete: recordData[this.percentDoneName],
+                startDate: recordData[this.startDateField] || today,
+                endDate: recordData[this.endDateField] || today,
+                asOfDate: today
+            };
+
+            config.inProgress = config.percentComplete > 0;
+            return Rally.util.HealthColorCalculator.calculateHealthColor(config).hex;
         },
-        isClickable: true
+
+        isClickable: true,
+        /**
+         * @cfg {Boolean}
+         * If the percent done is 0%, do not show the bar at all
+         */
+        showOnlyIfInProgress: false
+
     },
 
     constructor: function(config) {
@@ -438,35 +526,23 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEs
     config: {
         /**
          * @cfg {String}
-         * define a height if necessary to fit where it's being used
-         */
-        height:'15px',
-        /**
-         * @cfg {String}
          * sometimes it's necessary to name the variable used as the percent done replacement in the template,
          * like in a grid when a record is used to render the template.
          */
         percentDoneName: 'PercentDoneByStoryPlanEstimate',
+
         /**
          * @cfg {Function}
          * A function that should return true to show a triangle in the top right to denote something is missing.
          * Defaults to:
          *      function(){ return false; }
          */
-        showDangerNotificationFn:function (recordData) {
-            return !recordData.PlanEstimate;  //(!recordData.PlannedEndDate && !recordData.ActualEndDate) || recordData.UnEstimatedLeafStoryCount > 0;
-        },
+        showDangerNotificationFn: function (recordData) {
+            var summary = recordData._summary || {};
 
-        /**
-         * @cfg {Boolean}
-         * If the percent done is 0%, do not show the bar at all
-         */
-        showOnlyIfInProgress: false
-    },
-
-    constructor: function(config) {
-        this.initConfig(config);
-        return this.callParent(arguments);
+            return !summary.endDate || !summary.startDate ||
+                summary.unestimatedLeafStories > 0;
+        }
     }
 });
 
@@ -475,11 +551,7 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountT
     extend: 'Rally.ui.renderer.template.progressbar.StoryPercentDoneTemplate',
 
     config: {
-        /**
-         * @cfg {String}
-         * define a height if necessary to fit where it's being used
-         */
-        height:'15px',
+
         /**
          * @cfg {String}
          * sometimes it's necessary to name the variable used as the percent done replacement in the template,
@@ -493,307 +565,57 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountT
          *      function(){ return false; }
          */
         showDangerNotificationFn: function (recordData) {
-            return !this.startDateField || !recordData[this.startDateField] ||
-                !this.endDateField || !recordData[this.endDateField];
-        },
-
-        /**
-         * @cfg {Boolean}
-         * If the percent done is 0%, do not show the bar at all
-         */
-        showOnlyIfInProgress: false
-    },
-
-    constructor: function(config) {
-        this.initConfig(config);
-        return this.callParent(arguments);
+            var summary = recordData._summary || {};
+            console.log('sumary', summary, recordData.FormattedID);
+            return !summary.endDate || !summary.startDate;
+        }
     }
 });
-(function() {
-    var Ext = window.Ext4 || window.Ext;
 
-    var getDate = function(dateString){
-        return Ext.Date.parse(dateString,'c') || new Date(Date.parse(dateString));
-    };
+Ext.override(Rally.ui.popover.PercentDonePopover, {
 
-    var formatDate = function(dateString) {
-        var date = getDate(dateString);
-        return Rally.util.DateTime.formatWithDefault(date);
-    };
-
-    var getAcceptedTpl = _.memoize(function() {
-        return Ext.create('Ext.XTemplate',
-            '<h3>% DONE</h3>',
-            '<div class="percentDoneLine">',
-            '{[this.renderPercentDoneByStoryPlanEstimate(values)]}',
-            '<div class="percentDoneText">{AcceptedLeafStoryPlanEstimateTotal} of {LeafStoryPlanEstimateTotal} Points Accepted</div>',
-            '</div>',
-            '<div class="percentDoneLine">',
-            '{[this.renderPercentDoneByStoryCount(values)]}',
-            '<div class="percentDoneText">{AcceptedLeafStoryCount} of {LeafStoryCount} User Stories Accepted</div>',
-            '</div>',
-            '<tpl if="UnEstimatedLeafStoryCount &gt; 0">',
-            '<div class="dangerNotification percentDoneLine">',
-            'Missing Estimates: ',
-            '<div><b>{UnEstimatedLeafStoryCount} User Stor{[values.UnEstimatedLeafStoryCount == 1? "y" : "ies"]}</b></div>',
-            '</div>',
-            '</tpl>',
-            '<tpl if="!PlannedEndDate && !ActualEndDate">',
-            '<div class="dangerNotification percentDoneLine">Missing Planned End Date</div>',
-            '</tpl>', {
-                renderPercentDoneByStoryPlanEstimate: function(recordData) {
-                    return Ext.create('Rally.ui.renderer.template.progressbar.PortfolioItemPercentDoneTemplate', {
-                        percentDoneName: 'PercentDoneByStoryPlanEstimate',
-                        height: '15px',
-                        width: '50px',
-                        isClickable: false
-                    }).apply(recordData);
-                },
-                renderPercentDoneByStoryCount: function(recordData) {
-                    return Ext.create('Rally.ui.renderer.template.progressbar.PortfolioItemPercentDoneTemplate', {
-                        percentDoneName: 'PercentDoneByStoryCount',
-                        height: '15px',
-                        width: '50px',
-                        isClickable: false
-                    }).apply(recordData);
-                }
-            });
-    });
-
-    var getActualEndDateTpl = _.memoize(function() {
-        return Ext.create('Ext.XTemplate',
-            '<hr/>',
-            '<h3>ACTUAL END DATE</h3>',
-            '<div class="actualEndDateInfo percentDoneLine">',
-            '{[this.formatDate(values.ActualEndDate)]}',
-            '<tpl if="PlannedEndDate">',
-            ' ({[this.getEstimateMessage(values)]})',
-            '</tpl></div>', {
-                getEstimateMessage: _.bind(function(values) {
-                    var message;
-
-                    var actualEnd = getDate(values.ActualEndDate);
-                    var plannedEnd = getDate(values.PlannedEndDate);
-
-                    var diff = Rally.util.DateTime.getDifference(plannedEnd, actualEnd, 'day');
-                    if (diff === 0) {
-                        message = 'on time';
-                    } else if (diff > 0) {
-                        message = diff + ' day' + (diff === 1 ? '' : 's') + ' early';
-                    } else {
-                        diff = Math.abs(diff);
-                        message = diff + ' day' + (diff === 1 ? '' : 's') + ' late';
-                    }
-
-                    return message;
-                }, this),
-                formatDate: formatDate
-            });
-    });
-
-    var getNotesTpl = _.memoize(function() {
-        return Ext.create('Ext.XTemplate',
-            '<hr/>',
-            '<h3>NOTES</h3>',
-            '<div class="percentDoneLine">{Notes}</div>');
-    });
-
-    var getReleaseTpl = _.memoize(function() {
-        return Ext.create('Ext.XTemplate',
-            '<hr/>',
-            '<h3>{Release.Name} ({[this.formatDate(values.Release.ReleaseStartDate)]} - {[this.formatDate(values.Release.ReleaseDate)]})</h3>',
-            '<tpl if="this.shouldShowPlannedEndDateAlert(values)">',
-            '<tpl if="this.showUpdateText(values)">',
-            '<div class="dangerNotification percentDoneLine">{PortfolioItemTypeName} Planned End Date:',
-            '<div>',
-            '<b>{[this.formatDate(values.PlannedEndDate)]}</b> ',
-            '<tpl if="values.canUpdate">',
-            '<a class="update-link">Update to {[this.formatDate(values.Release.ReleaseDate)]}</a>',
-            '</tpl>',
-            '</div>',
-            '</div>',
-            '</tpl>',
-            '<tpl if="this.showViewText(values)">',
-            '<div class="dangerNotification percentDoneLine">' +
-            '{PortfolioItemTypeName} Planned Start &amp; End Dates ',
-            '({[this.formatDate(values.PlannedStartDate)]} - {[this.formatDate(values.PlannedEndDate)]}) exist',
-            ' outside of the Release End Date.',
-            '<tpl if="values.canUpdate">',
-            '<a class="detail-link">View</a>',
-            '</tpl>',
-            '</div>',
-            '</tpl>',
-            '</tpl>',
-            {
-                formatDate: formatDate,
-                showUpdateText: function(percentDoneData) {
-                    var start = percentDoneData.PlannedStartDate;
-                    return !start || getDate(start) <= getDate(percentDoneData.Release.ReleaseDate);
-                },
-                showViewText: function(percentDoneData) {
-                    return !this.showUpdateText(percentDoneData);
-                },
-                shouldShowPlannedEndDateAlert: function(percentDoneData) {
-                    return percentDoneData.instance._shouldShowReleaseSection(percentDoneData);
-                }
-            }
-        );
-    });
-
-    var getLateChildTpl = _.memoize(function() {
-        return Ext.create('Ext.XTemplate',
-            '<tpl if="this.shouldShowLateChildAlert(values)">',
-            '<div class="dangerNotification percentDoneLine">' +
-            'Assigned to later releases or iterations:',
-            '<div>',
-            '<b>{LateChildCount} {[this.getUserStoriesText(values.LateChildCount)]}</b> ',
-            '<a class="late-story-view-link">View</a>',
-            '</div>',
-            '</div>',
-            '</tpl>',
-            {
-                getUserStoriesText: function(lateChildCount){
-                    return lateChildCount > 1 ? 'User Stories' : 'User Story';
-                },
-                shouldShowLateChildAlert: function(percentDoneData) {
-                    return percentDoneData.instance._shouldShowLateChildAlert(percentDoneData);
-                }
-            });
-    });
-
-    /**
-     * A Rally.ui.popover.Popover extended to show data about a Portfolio Item's percent done.
-     * It's expected to be used in 2 ways, by passing in the data at initialization time, or at show time so the Popover can be reused.
-     *
-     * The first way:
-     *
-     *      Ext.create('Rally.ui.popover.PercentDonePopover', {
-     *          target: targetEl, //the element, or id, that the popover displays for when it's clicked
-     *          percentDoneData: {
-     *              ActualEndDate: 'Thu Nov 10 00:00:00 MST 2011',
-     *              PlannedEndDate: 'Thu Nov 12 00:00:00 MST 2011',
-     *              //... other data
-     *          }
-     *      });
-     *
-     *
-     * The second way:
-     *
-     *      var pop = Ext.create('Rally.ui.popover.PercentDonePopover', {
-     *          target: Ext.getBody(),
-     *          delegate: '.mySelectorForAllTargets'
-     *      }
-     *
-     *      //attach to 'beforeshow' to update at some later time
-     *      pop.on('beforeshow', function(){
-     *
-     *          pop.updateContent({
-     *              ActualEndDate: 'Thu Nov 10 00:00:00 MST 2011',
-     *              PlannedEndDate: 'Thu Nov 12 00:00:00 MST 2011',
-     *              //... other data
-     *          });
-     *
-     *          //or just give it a record's data:
-     *          pop.updateContent(record.data);
-     *      });
-     *
-     *  It can also be created via Rally.ui.popover.PopoverFactory#bake:
-     *
-     *     Rally.ui.popover.PopoverFactory.bake({
-     *         field: 'PercentDoneByStoryCount' //or 'PercentDoneByPlanEstimate'
-     *     });
-     */
-    Ext.define('Rally.ui.popover.PercentDonePopover', {
-        extend: 'Rally.ui.popover.Popover',
-
-        mixins: [
-            'Rally.Messageable'
-        ],
-
-        clientMetrics: [
-            {
-                method: '_onClickUpdatePlannedEndDate',
-                description: 'clicked to update planned end date from ' + window.location.href
-            },
-            {
-                beginMethod: '_onClickUpdatePlannedEndDate',
-                endMethod: '_onPlannedEndDateUpdated',
-                description: 'updated planned end date'
-            }
-        ],
-
-        config: {
-            /**
-             * @cfg {Object} percentDoneData (optional) data to use for the Popover.
-             * Optional to define it when created, can be passed to updateContent directly if you need to handle it later.
-             * @cfg {Number} percentDoneData.PercentDoneByStoryPlanEstimate
-             * @cfg {Number} percentDoneData.PercentDoneByStoryCount
-             * @cfg {String/Date} percentDoneData.ActualEndDate
-             * @cfg {String/Date} percentDoneData.PlannedStartDate
-             * @cfg {String/Date} percentDoneData.PlannedEndDate
-             * @cfg {Number} percentDoneData.AcceptedLeafStoryPlanEstimateTotal
-             * @cfg {Number} percentDoneData.LeafStoryPlanEstimateTotal
-             * @cfg {Number} percentDoneData.AcceptedLeafStoryCount
-             * @cfg {Number} percentDoneData.LeafStoryCount
-             * @cfg {Number} percentDoneData.UnEstimatedLeafStoryCount
-             * @cfg {String} percentDoneData.Notes
-             */
-            percentDoneData: {
-                PercentDoneByStoryPlanEstimate: 0,
-                PercentDoneByStoryCount: 0,
-                ActualEndDate: undefined,
-                PlannedStartDate: undefined,
-                PlannedEndDate: undefined,
-                AcceptedLeafStoryPlanEstimateTotal: 0,
-                LeafStoryPlanEstimateTotal: 0,
-                AcceptedLeafStoryCount: 0,
-                LeafStoryCount: 0,
-                UnEstimatedLeafStoryCount: 0,
-                Notes: undefined,
-                PortfolioItemTypeOrdinal: undefined,
-                LateChildCount: 0
-            },
-
-            /**
-             * @cfg {Boolean} canUpdate (optional)
-             * Indicates if the user can update the portfolio item
-             */
-            canUpdate: false,
-
-            /**
-             * @cfg {Boolean} legacyPage (optional)
-             * Indicates if the request is originating from a legacy page
-             */
-            legacyPage: false,
-
-            /**
-             * @cfg {Number} oid (optional)
-             * Object ID of the portfolio item
-             */
-            oid:null,
-
-            /**
-             * @cfg {String} piRef (optional)
-             * _ref url of the portfolio item
-             */
-            piRef:null,
-
-            /**
-             * @cfg {String} percentDoneName (required)
-             * The name of the field to use to show the status for.
-             * Necessary because the PI might be "On Track" when considering stories completed,
-             * but "Late" if considering the plan estimates of stories completed and not completed.
-             */
-            percentDoneName: 'PercentDoneByStoryCount',
-
-            width:320,
-            manageHeight:false
-        },
-
-        id: 'percentDonePopover',
-        cls: 'percentDonePopover',
 
         constructor: function(config) {
+            //percentDoneData: {
+            //    PercentDoneByStoryPlanEstimate: 0,
+            //    PercentDoneByStoryCount: 0,
+            //    ActualEndDate: undefined,
+            //    PlannedStartDate: undefined,
+            //    PlannedEndDate: undefined,
+            //    AcceptedLeafStoryPlanEstimateTotal: 0,
+            //    LeafStoryPlanEstimateTotal: 0,
+            //    AcceptedLeafStoryCount: 0,
+            //    LeafStoryCount: 0,
+            //    UnEstimatedLeafStoryCount: 0,
+            //    Notes: undefined,
+            //    PortfolioItemTypeOrdinal: undefined,
+            //    LateChildCount: 0
+            //},
+
+            if (config.percentDoneData._type === 'hierarchicalrequirement'){
+                var summaryData = config.percentDoneData._summary;
+
+                var plannedEndDate = new Date(),
+                    plannedStartDate = new Date();
+                if (config.percentDoneData.PortfolioItem){
+                    plannedEndDate = summaryData.endDate;
+                    plannedStartDate = summaryData.startDate;
+                    console.log('c',config.percentDoneData.FormattedID, summaryData, config.percentDoneData);
+                }
+
+                config.percentDoneData.AcceptedLeafStoryCount = summaryData.totalAcceptedCount;
+                config.percentDoneData.AcceptedLeafStoryPlanEstimateTotal = summaryData.totalAcceptedPlanEstimate;
+                config.percentDoneData.LeafStoryCount = summaryData.totalCount;
+                config.percentDoneData.LeafStoryPlanEstimateTotal = summaryData.totalPlanEstimate;
+                config.percentDoneData.ActualEndDate = config.percentDoneData.AcceptedDate;
+                config.percentDoneData.PlannedEndDate = plannedEndDate;
+                config.percentDoneData.ActualStartDate = config.percentDoneData.InProgressDate;
+                config.percentDoneData.PlannedStartDate = plannedStartDate;
+                config.percentDoneData.LateChildCount = 0;
+                config.percentDoneData.UnEstimatedLeafStoryCount = summaryData.unestimatedLeafStories;
+            }
+
+            console.log('popoveroverrides', config);
             this.id += Ext.Date.now().toString();
             if (!Ext.getElementById(this.id)) {
                 this.initConfig(config);
@@ -819,312 +641,13 @@ Ext.define('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountT
 
                 this.callParent(arguments);
             }
-        },
-
-        /**
-         * Update the Popover with new data.
-         * Takes the same options that the percentDoneData config option accepts. Matches the Names of fields on Portfolio Item records
-         * so you can just pass in record.data to update.
-         * @param {Object} percentDoneData (optional)
-         * @param {String/Date} percentDoneData.ActualEndDate
-         * @param {String/Date} percentDoneData.PlannedEndDate
-         * @param {Number} percentDoneData.AcceptedLeafStoryPlanEstimateTotal
-         * @param {Number} percentDoneData.LeafStoryPlanEstimateTotal
-         * @param {Number} percentDoneData.AcceptedLeafStoryCount
-         * @param {Number} percentDoneData.LeafStoryCount
-         * @param {Number} percentDoneData.UnEstimatedLeafStoryCount
-         * @param {String} percentDoneData.Notes
-         * @param {Object} percentDoneData.Release
-         * @param {Number} percentDoneData.PortfolioItemTypeOrdinal
-         */
-        updateContent: function(percentDoneData) {
-            var popoverContent = this.down('#percentDonePopoverContent');
-
-            if (popoverContent) {
-                this.config.percentDoneData = Ext.applyIf(percentDoneData || {}, this.config.percentDoneData);
-                var content = this._buildContent(this.config.percentDoneData);
-                popoverContent.update(content);
-                this._setTitle();
-                this._attachActions();
-            }
-        },
-
-        _setTitle: function() {
-            this.setTitle(Rally.util.HealthColorCalculator.calculateHealthColorForPortfolioItemData(this.config.percentDoneData,
-                this.getPercentDoneName()).label);
-        },
-
-        _buildContent: function(percentDoneData) {
-            var html = '';
-            percentDoneData.instance = this;
-            percentDoneData.canUpdate = this.config.canUpdate;
-
-            html += '<div class="percentDoneContainer">';
-
-            html += getAcceptedTpl().apply(percentDoneData);
-
-            if (!Ext.isEmpty(percentDoneData.ActualEndDate)) {
-                html += getActualEndDateTpl().apply(percentDoneData);
-            }
-
-            //ajax request
-            if(this._shouldShowReleaseSection(percentDoneData)) {
-                html += getReleaseTpl().apply(percentDoneData);
-
-                if(this._shouldShowLateChildAlert(percentDoneData)) {
-                    html += getLateChildTpl().apply(percentDoneData);
-                }
-            }
-
-            if (this._shouldShowNotes(percentDoneData)) {
-                html += getNotesTpl().apply(percentDoneData);
-            }
-
-            html += '</div>';
-
-            return html;
-        },
-
-        _releaseQueried:false,
-
-        _retrievePortfolioItemType: function(){
-            Ext.create("Rally.data.wsapi.Store",{
-                autoLoad: true,
-                model: Ext.identityFn('TypeDefinition'),
-                filters: [
-                    {
-                        property: 'Parent.Name',
-                        operator: '=',
-                        value: 'Portfolio Item'
-                    },
-                    {
-                        property: 'Ordinal',
-                        operator: '=',
-                        value: '0'
-                    }
-                ],
-                listeners:{
-                    load: this._onPortfolioItemTypeRetrieved,
-                    scope:this
-                }
-            });
-        },
-
-        _onPortfolioItemTypeRetrieved: function(typeDefStore){
-            var record = typeDefStore.getAt(0).data;
-            this.config.percentDoneData.PortfolioItemTypeOrdinal = record.Ordinal;
-            this.config.percentDoneData.PortfolioItemTypeName = record.Name;
-            this._retrieveReleaseData(record.TypePath);
-        },
-
-        _retrieveReleaseData: function(typePath){
-            var fetchFields = ["Release", "ReleaseDate", "ReleaseStartDate", "Name", "PlannedStartDate", "PlannedEndDate", "LateChildCount"];
-            if (!Ext.isString(this.config.percentDoneData.Notes)) {
-                fetchFields.push('Notes');
-            }
-            this.store = Ext.create("Rally.data.wsapi.Store", {
-                model: typePath,
-                fetch: fetchFields,
-                filters: [
-                    {
-                        property: "ObjectID",
-                        operator: "=",
-                        value: this.config.oid || Rally.util.Ref.getOidFromRef(this.config.piRef)
-                    }
-                ],
-                autoLoad: true,
-                listeners: {
-                    load: this._onReleaseDataRetrieved,
-                    scope: this
-                }
-            });
-        },
-
-        _onReleaseDataRetrieved: function(store){
-            var record = store.getAt(0);
-            this._releaseQueried = true;
-            if (record){
-                this.config.percentDoneData.Release = record.data.Release;
-                this.config.percentDoneData.PlannedStartDate = record.data.PlannedStartDate;
-                this.config.percentDoneData.PlannedEndDate = record.data.PlannedEndDate;
-                this.config.percentDoneData.LateChildCount = record.data.LateChildCount;
-                this.config.canUpdate = record.self.getPermissionLevels(record.data._p).updatable;
-                if (!Ext.isString(this.config.percentDoneData.Notes)) {
-                    this.config.percentDoneData.Notes = record.data.Notes;
-                }
-                this.updateContent({
-                    Release: record.data.Release
-                });
-            }else{
-                this.updateContent();
-            }
-
-            if (Rally.BrowserTest) {
-                Rally.BrowserTest.publishComponentReady(this);
-            }
-        },
-
-        _attachActions: function(){
-            this.getEl().select('a.update-link').on('click', this._onClickUpdatePlannedEndDate, this);
-            this.getEl().select('a.detail-link').on('click', this._onClickViewDetail, this);
-            this.getEl().select('a.late-story-view-link').on('click', this._onClickLateStories, this);
-        },
-
-        _onClickUpdatePlannedEndDate: function(evt, el){
-            Ext.get(el)
-                .removeAllListeners()
-                .setStyle({
-                    color:'gray',
-                    cursor:'default'
-                })
-                .update(el.innerHTML.replace('Update','Updating') + '...');
-
-            var record = this.store.getAt(0);
-            record.set('PlannedEndDate',record.data.Release.ReleaseDate);
-            record.save({
-                success: this._onPlannedEndDateUpdated,
-                scope: this
-            });
-        },
-
-        _onClickViewDetail: function(){
-            var data = this.store.getAt(0);
-            this.destroy();
-            window.location = Rally.nav.Manager.getDetailUrl(data);
-        },
-
-        _onClickLateStories: function() {
-            var record = this.store.getAt(0),
-                filters = this._filterPopover(record.data),
-                target = this.target,
-                targetSelector = this.targetSelector;
-
-            //  Close the % done popover
-            this.destroy();
-
-            //  Open the new popover
-            var reloadStoreCallback;
-            Rally.ui.popover.PopoverFactory.bake({
-                target: target,
-                targetSelector: targetSelector,
-                record: record,
-                field: 'UserStory',
-                autoShow: false,
-                title: 'User Stories Assigned to Later Releases or Iteration',
-                items: [{
-                    gridConfig: {
-                        storeConfig: {
-                            filters: filters
-                        },
-                        listeners: {
-                            viewready: function(grid) {
-                                reloadStoreCallback = _.bind(this._reloadStore, this, grid);
-                                this.subscribe(Rally.Message.recordUpdateSuccess, reloadStoreCallback);
-                            },
-                            destroy: function(grid) {
-                                this.unsubscribe(Rally.Message.recordUpdateSuccess, reloadStoreCallback);
-                            },
-                            scope: this
-                        }
-                    }
-                }]
-            }).show();
-        },
-
-        _filterPopover: function(record) {
-            return [
-                {
-                    property: 'Feature',
-                    operator: '=',
-                    value: record._ref
-                },
-                {
-                    property: 'DirectChildrenCount',
-                    operator: '=',
-                    value: 0
-                },
-                Rally.data.wsapi.Filter.or([
-                    {
-                        property: 'Iteration.EndDate',
-                        operator: '>',
-                        value: record.Release.ReleaseDate
-                    },
-                    {
-                        property: 'Release.ReleaseDate',
-                        operator: '>',
-                        value: record.Release.ReleaseDate
-                    }
-                ])
-            ];
-        },
-
-        _onPlannedEndDateUpdated: function(record) {
-            if (this.config.legacyPage) {
-                this.publish(Rally.app.Message.legacyPageRefreshRequest);
-            }
-            this.publish(Rally.Message.objectUpdate, record, ['PlannedEndDate'], this);
-            this.publish(Rally.Message.recordUpdateSuccess, record);
-            this.updateContent({PlannedEndDate:record.data.PlannedEndDate});
-        },
-
-        _hasReleaseData: function(data){
-            return this._releaseQueried ||
-                (Ext.isObject(data.Release) && Ext.isNumber(data.PortfolioItemTypeOrdinal) && Ext.isString(data.Notes));
-        },
-
-        _shouldShowNotes: function(data){
-            return this._hasReleaseData(data) && !Ext.isEmpty(data.Notes);
-        },
-
-        _shouldShowReleaseSection: function(data){
-            return this._hasReleaseData(data) &&
-                Ext.isObject(data.Release) &&
-                data.Release.ReleaseDate &&
-                data.PortfolioItemTypeOrdinal === 0 && //is feature
-                data.PlannedEndDate && //has planned end date
-                getDate(data.Release.ReleaseDate.toString()) < getDate(data.PlannedEndDate.toString()); // release end date < planned end date
-        },
-
-        _shouldShowLateChildAlert: function (data){
-            return data.LateChildCount > 0;
-        },
-
-        // We manually adjust the editing plugin to the correct position if a grid item is removed after an edit
-        _reloadStore: function(grid, record) {
-            var scope = this._createEditorScope(grid);
-            if (scope.activeRecordPosition !== -1) {
-                grid.editingPlugin.cancelEdit();
-            }
-            grid.store.reload({
-                callback: function() {
-                    if (scope.activeRecordPosition !== -1) {
-                        var newPosition = grid.store.find('_ref', scope.activeRecord.data._ref);
-                        if (newPosition === -1) {
-                            newPosition = scope.activeRecordPosition;
-                        }
-                        if (newPosition < grid.store.getCount()) {
-                            grid.editingPlugin.startEdit(grid.store.data.items[newPosition], scope.activeColumn);
-                        }
-                    }
-                }
-            });
-        },
-
-        _createEditorScope: function(grid) {
-            var scope = {};
-            scope.editor = grid.editingPlugin;
-            scope.activeColumn = scope.editor.getActiveColumn();
-            scope.activeRecord = scope.editor.getActiveRecord();
-            scope.activeRecordPosition = (scope.activeRecord && scope.activeRecord.data) ? grid.store.find('_ref', scope.activeRecord.data._ref) : -1;
-
-            return scope;
         }
-    });
-})();
+});
+
 Ext.define('CArABU.technicalservices.StoryRollupCustomListSettings',{
     singleton: true,
 
-    storyStartDateField: 'fred',
+    storyStartDateField: undefined,
     storyEndDateField: undefined
 });
 
@@ -1137,7 +660,7 @@ Ext.define('CArABU.technicalservices.TeamsTemplateColumn', {
     initComponent: function(){
         var me = this;
 
-        Ext.QuickTips.init();
+        Ext.QuickTips.init(true, { hideDelay: 10000});
 
         me.tpl = new Ext.XTemplate('<tpl><div data-qtip="{[this.getTooltip(values)]}" style="cursor:pointer;text-align:right;">{[this.getTeamsText(values)]}</div></tpl>',{
             getTeamsText: function(values){
@@ -1197,13 +720,18 @@ Ext.define("story-rollup-custom-list", {
     config: {
         defaultSettings: {
             queryFilter: "",
-            tfsLinkField: "c_TFSLink"
+            tfsLinkField: "c_TFSLink",
+            storyStartDateField: "c_TeamFeatureStartDate",
+            storyEndDateField: "c_TeamFeatureEndDate"
         }
     },
 
     acceptedScheduleStates: ['Accepted'],
 
     launch: function() {
+        CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField = this.getStartDateField();
+        CArABU.technicalservices.StoryRollupCustomListSettings.storyEndDateField = this.getEndDateField();
+
         this.initializeCompletedScheduleStates("Accepted").then({
             success: this.initializeApp,
             failure: this.showErrorNotification,
@@ -1260,6 +788,12 @@ Ext.define("story-rollup-custom-list", {
     getTFSTeamPrefix: function(){
         return "TFS: ";
     },
+    getEndDateField: function(){
+        return this.getSetting('storyEndDateField');
+    },
+    getStartDateField: function(){
+        return this.getSetting('storyStartDateField');
+    },
     getInitialFilters: function(){
         var query = this.getSetting('queryFilter');
         if (query && query.length > 0){
@@ -1276,6 +810,7 @@ Ext.define("story-rollup-custom-list", {
         this.logger.log('updateView', piType);
 
         this.childHash = {};
+        this.summaryInfo = {};
         this.getGridBox().removeAll();
 
         if (!piType){
@@ -1283,9 +818,13 @@ Ext.define("story-rollup-custom-list", {
         }
 
         this.modelNames = [piType];
+        var fetch = [this.getFeatureName(),'ScheduleState','PlanEstimate'];
+        if (this.getTFSLinkField()){ fetch.push(this.getTFSLinkField());}
+        if (this.getStartDateField()){ fetch.push(this.getStartDateField());}
+        if (this.getEndDateField()){ fetch.push(this.getEndDateField());}
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: this.modelNames,
-            fetch: [this.getFeatureName(),'ScheduleState','PlanEstimate', this.getTFSLinkField()],
+            fetch: fetch,
             enableHierarchy: true,
             filters: this.getInitialFilters()
         }).then({
@@ -1322,11 +861,6 @@ Ext.define("story-rollup-custom-list", {
                     model: 'HierarchicalRequirement',
                     context: { project: null },
                     fetch: ['PlanEstimate','ScheduleState','PortfolioItem','Parent','ObjectID','Project','Name',this.getTFSLinkField()],
-                    filters: {
-                        property: 'Parent.ObjectID',
-                        operator: '>',
-                        value: 0
-                    }
                 },
                 chunkProperty: featureName + '.ObjectID',
                 chunkValue: featureOids
@@ -1340,35 +874,44 @@ Ext.define("story-rollup-custom-list", {
         }
 
         if (subLevelRecords.length > 0){
-           this.updateAdditionalFields(subLevelRecords, this.childHash || {});
+           this.updateAdditionalFields(subLevelRecords);
         }
 
     },
-    updateAdditionalFields: function(records, childHash){
-        this.logger.log('updateAdditionalFields',records, childHash);
+    updateAdditionalFields: function(records){
+        this.logger.log('updateAdditionalFields',records, this.summaryInfo);
+        this.down('rallygridboard').getGridOrBoard().getStore().suspendEvents();
+
         for (var i=0; i< records.length; i++){
-            var r = records[i],
-                totals = this.getChildTotals(r, childHash);
+              var r = records[i],
+                  parent = r.get('Parent') && r.get('Parent').ObjectID,
+                    totals = this.summaryInfo[r.get('ObjectID')] || {};
+
+            if (parent){
+                totals.startDate = this.summaryInfo[parent].startDate;
+                totals.endDate = this.summaryInfo[parent].endDate;
+            }
 
             var percentDoneByStoryCount = totals.totalCount > 0 ? totals.totalAcceptedCount/totals.totalCount : 0,
                 percentDoneByPlanEstimate = totals.totalPlanEstimate > 0 ? totals.totalAcceptedPlanEstimate/totals.totalPlanEstimate : 0;
 
-            this.logger.log('updateAdditionalFields results', percentDoneByPlanEstimate,percentDoneByStoryCount,totals.projects);
-
             r.set('PercentDoneByStoryCount',percentDoneByStoryCount);
             r.set('PercentDoneByStoryPlanEstimate',percentDoneByPlanEstimate);
             r.set('Teams', totals.projects);
+            r.set('_summary', totals);
         }
-
+        this.down('rallygridboard').getGridOrBoard().getStore().resumeEvents();
     },
     processChildren: function(topLevelStoryRecords, childRecords){
         this.logger.log('processChildren', childRecords)
+
         if (!childRecords || childRecords.length == 0){
-            this.updateAdditionalFields(topLevelStoryRecords,this.childHash || {});
+            this.updateAdditionalFields(topLevelStoryRecords);
             return;
         }
 
-        var childHash = this.childHash || {};
+        var childHash = {};
+
         for (var i=0; i<childRecords.length; i++){
             var child = childRecords[i].getData(),
                 parent = (child.PortfolioItem && child.PortfolioItem.ObjectID) ||
@@ -1381,11 +924,23 @@ Ext.define("story-rollup-custom-list", {
                 childHash[parent].push(child);
             }
         }
-        this.childHash = childHash;
 
         this.logger.log('processChildren', childHash, topLevelStoryRecords);
+        var startDateField = this.getStartDateField(),
+            endDateField = this.getEndDateField();
 
-        this.updateAdditionalFields(topLevelStoryRecords,childHash);
+        for (var i=0; i< topLevelStoryRecords.length; i++) {
+            var r = topLevelStoryRecords[i],
+                oid = r.get('ObjectID'),
+                startDate = r.get(startDateField),
+                endDate = r.get(endDateField);
+
+            this.summaryInfo[oid] = this.getChildTotals(r, childHash);
+            this.summaryInfo[oid].startDate = startDate;
+            this.summaryInfo[oid].endDate = endDate;
+
+        }
+        this.updateAdditionalFields(topLevelStoryRecords);
 
     },
     getChildTotals: function(record, childHash){
@@ -1399,7 +954,8 @@ Ext.define("story-rollup-custom-list", {
             totalAcceptedCount = 0,
             projects = [],
             tfsLinkField = this.getTFSLinkField(),
-            tfsPrefix = this.getTFSTeamPrefix();
+            tfsPrefix = this.getTFSTeamPrefix(),
+            unestimatedLeafStories = 0;
 
         if (children.length > 0) {
             Ext.Array.each(children, function (c) {
@@ -1410,24 +966,30 @@ Ext.define("story-rollup-custom-list", {
 
                 if (childHash[c.ObjectID]) {
                     totals = this.getChildTotals(c, childHash, acceptedScheduleStates);
+                    this.summaryInfo[c.ObjectID] = totals;
                 } else {
                     var isAccepted = Ext.Array.contains(acceptedScheduleStates, c.ScheduleState),
                         acceptedPlanEstimate = isAccepted && c.PlanEstimate || 0,
                         acceptedTotal = isAccepted && 1 || 0,
                         isTFS = c[tfsLinkField],
-                        projectName = c.Project && c.Project.Name;
+                        projectName = c.Project && c.Project.Name,
+                        unestimated = !c.PlanEstimate && (c.PlanEstimate !== 0);
 
                     if (isTFS){
                         projectName = tfsPrefix + projectName;
                     }
+
                     totals = {
+                        unestimatedLeafStories: unestimated && 1 || 0,
                         totalPlanEstimate: c.PlanEstimate || 0,
                         totalAcceptedPlanEstimate: acceptedPlanEstimate,
                         totalCount: 1,
                         totalAcceptedCount: acceptedTotal,
                         projects: [projectName]
                     };
+                    this.summaryInfo[c.ObjectID] = totals;
                 }
+                unestimatedLeafStories += totals.unestimatedLeafStories;
                 totalPlanEstimate += totals.totalPlanEstimate;
                 totalAcceptedPlanEstimate += totals.totalAcceptedPlanEstimate;
                 totalCount += totals.totalCount;
@@ -1439,13 +1001,24 @@ Ext.define("story-rollup-custom-list", {
             var recordData = record.ObjectID ? record : record.getData(),
                 isAccepted = Ext.Array.contains(acceptedScheduleStates, recordData.ScheduleState),
                 acceptedPlanEstimate = isAccepted && recordData.PlanEstimate || 0,
-                acceptedTotal = isAccepted && 1 || 0;
+                acceptedTotal = isAccepted && 1 || 0,
+                unestimatedCount = (!recordData.PlanEstimate && (recordData.PlanEstimate !== 0) && 1) || 0;
 
+            unestimatedLeafStories = unestimatedCount;
             totalPlanEstimate = recordData.PlanEstimate || 0;
             totalAcceptedPlanEstimate = acceptedPlanEstimate;
             totalCount = 1;
             totalAcceptedCount = acceptedTotal;
             projects = [recordData.Project && recordData.Project.Name]
+
+            this.summaryInfo[recordData.ObjectID] = {
+                unestimatedLeafStories: unestimatedCount,
+                totalPlanEstimate: recordData.PlanEstimate || 0,
+                totalAcceptedPlanEstimate: acceptedPlanEstimate,
+                totalCount: 1,
+                totalAcceptedCount: acceptedTotal,
+                projects: [recordData.Project && recordData.Project.Name]
+            }
         }
 
 
@@ -1454,7 +1027,8 @@ Ext.define("story-rollup-custom-list", {
             totalAcceptedPlanEstimate: totalAcceptedPlanEstimate,
             totalCount: totalCount,
             totalAcceptedCount: totalAcceptedCount,
-            projects: projects
+            projects: projects,
+            unestimatedLeafStories: unestimatedLeafStories
         };
     },
     showErrorNotification: function(msg){
@@ -1583,6 +1157,28 @@ Ext.define("story-rollup-custom-list", {
                 }
                 return false;
             }
+        },{
+            xtype: 'rallyfieldcombobox',
+            model: 'hierarchicalrequirement',
+            name: 'storyStartDateField',
+            fieldLabel: 'Story StartDate Field',
+            labelAlign: 'right',
+            labelWidth: 100,
+            _isNotHidden: function(field){
+                return (!field.readOnly && field.attributeDefinition && field.attributeDefinition.AttributeType === 'DATE');
+            }
+
+        },{
+            xtype: 'rallyfieldcombobox',
+            model: 'hierarchicalrequirement',
+            name: 'storyEndDateField',
+            fieldLabel: 'Story EndDate Field',
+            labelAlign: 'right',
+            labelWidth: 100,
+            _isNotHidden: function(field){
+                return (!field.readOnly && field.attributeDefinition && field.attributeDefinition.AttributeType === 'DATE');
+            }
+
         },{
             xtype: 'textarea',
             fieldLabel: 'Query',

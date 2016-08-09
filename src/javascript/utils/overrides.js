@@ -118,3 +118,70 @@ Ext.override(Rally.ui.renderer.RendererFactory, {
     }
 
 });
+
+Ext.override(Rally.ui.popover.PopoverFactory,{
+    popovers: {
+        Discussion: function(config) {
+            return Ext.create('Rally.ui.popover.DiscussionPopover', this._getConfig(config));
+        },
+
+        UserStory: function(config) {
+            return Ext.create('Rally.ui.popover.UserStoryPopover', this._getConfig(config));
+        },
+
+        Task: function(config){
+            return Ext.create('Rally.ui.popover.TaskPopover', this._getConfig(config));
+        },
+
+        Defect: function(config) {
+            if (config.type === 'testset' || (config.record && config.record.isTestSet())) {
+                return Ext.create('Rally.ui.popover.TestCaseDefectPopover', this._getConfig(config));
+            } else {
+                return Ext.create('Rally.ui.popover.DefectPopover', this._getConfig(config));
+            }
+        },
+
+        TestCase: function(config){
+            return Ext.create('Rally.ui.popover.TestCasePopover', this._getConfig(config));
+        },
+
+        Description: function(config) {
+            return Ext.create('Rally.ui.popover.DescriptionPopover', this._getConfig(config));
+        },
+
+        Owner: function(config){
+            return Ext.create('Rally.ui.popover.OwnerPopover', this._getConfig(config));
+        },
+
+        Color: function(config){
+            return Ext.create('Rally.ui.popover.ColorPopover', this._getConfig(config));
+        },
+
+        PercentDoneByStoryCount: function (config) {
+            console.log('popover',config);
+            return Ext.create('Rally.ui.popover.PercentDonePopover', this._getConfig(config));
+        },
+
+        PercentDoneByStoryPlanEstimate: function (config) {
+            console.log('popover',config);
+            return Ext.create('Rally.ui.popover.PercentDonePopover', this._getConfig(config));
+        },
+
+        PredecessorsAndSuccessors: function(config) {
+            return Ext.create('Rally.ui.popover.DependenciesPopover', this._getConfig(config));
+        },
+
+        WorkProduct: function (config) {
+            return Ext.create('Rally.ui.popover.WorkProductPopover', this._getConfig(config));
+        },
+
+        _getConfig: function(config) {
+            return Ext.merge({
+                context: {
+                    workspace: config.record.get('Workspace')._ref,
+                    project: null
+                }
+            }, config);
+        }
+    }
+});
