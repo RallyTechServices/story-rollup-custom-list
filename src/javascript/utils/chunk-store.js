@@ -1,6 +1,6 @@
 Ext.define('CArABU.technicalservices.chunk.Store',{
 
-    MAX_CHUNK_SIZE: 25,
+    MAX_CHUNK_SIZE: 50,
     logger: new Rally.technicalservices.Logger(),
 
     constructor: function(config) {

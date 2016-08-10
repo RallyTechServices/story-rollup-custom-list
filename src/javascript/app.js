@@ -15,13 +15,18 @@ Ext.define("story-rollup-custom-list", {
     config: {
         defaultSettings: {
             queryFilter: "",
-            tfsLinkField: "c_TFSLink"
+            tfsLinkField: "c_TFSLink",
+            storyStartDateField: "c_TeamFeatureStartDate",
+            storyEndDateField: "c_TeamFeatureEndDate"
         }
     },
 
     acceptedScheduleStates: ['Accepted'],
 
     launch: function() {
+        CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField = this.getStartDateField();
+        CArABU.technicalservices.StoryRollupCustomListSettings.storyEndDateField = this.getEndDateField();
+
         this.initializeCompletedScheduleStates("Accepted").then({
             success: this.initializeApp,
             failure: this.showErrorNotification,
@@ -78,6 +83,12 @@ Ext.define("story-rollup-custom-list", {
     getTFSTeamPrefix: function(){
         return "TFS: ";
     },
+    getEndDateField: function(){
+        return this.getSetting('storyEndDateField');
+    },
+    getStartDateField: function(){
+        return this.getSetting('storyStartDateField');
+    },
     getInitialFilters: function(){
         var query = this.getSetting('queryFilter');
         if (query && query.length > 0){
@@ -94,6 +105,7 @@ Ext.define("story-rollup-custom-list", {
         this.logger.log('updateView', piType);
 
         this.childHash = {};
+        this.summaryInfo = {};
         this.getGridBox().removeAll();
 
         if (!piType){
@@ -101,9 +113,13 @@ Ext.define("story-rollup-custom-list", {
         }
 
         this.modelNames = [piType];
+        var fetch = [this.getFeatureName(),'ScheduleState','PlanEstimate'];
+        if (this.getTFSLinkField()){ fetch.push(this.getTFSLinkField());}
+        if (this.getStartDateField()){ fetch.push(this.getStartDateField());}
+        if (this.getEndDateField()){ fetch.push(this.getEndDateField());}
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: this.modelNames,
-            fetch: [this.getFeatureName(),'ScheduleState','PlanEstimate', this.getTFSLinkField()],
+            fetch: fetch,
             enableHierarchy: true,
             filters: this.getInitialFilters()
         }).then({
@@ -140,11 +156,6 @@ Ext.define("story-rollup-custom-list", {
                     model: 'HierarchicalRequirement',
                     context: { project: null },
                     fetch: ['PlanEstimate','ScheduleState','PortfolioItem','Parent','ObjectID','Project','Name',this.getTFSLinkField()],
-                    filters: {
-                        property: 'Parent.ObjectID',
-                        operator: '>',
-                        value: 0
-                    }
                 },
                 chunkProperty: featureName + '.ObjectID',
                 chunkValue: featureOids
@@ -158,35 +169,44 @@ Ext.define("story-rollup-custom-list", {
         }
 
         if (subLevelRecords.length > 0){
-           this.updateAdditionalFields(subLevelRecords, this.childHash || {});
+           this.updateAdditionalFields(subLevelRecords);
         }
 
     },
-    updateAdditionalFields: function(records, childHash){
-        this.logger.log('updateAdditionalFields',records, childHash);
+    updateAdditionalFields: function(records){
+        this.logger.log('updateAdditionalFields',records, this.summaryInfo);
+        this.down('rallygridboard').getGridOrBoard().getStore().suspendEvents();
+
         for (var i=0; i< records.length; i++){
-            var r = records[i],
-                totals = this.getChildTotals(r, childHash);
+              var r = records[i],
+                  parent = r.get('Parent') && r.get('Parent').ObjectID,
+                    totals = this.summaryInfo[r.get('ObjectID')] || {};
+
+            if (parent){
+                totals.startDate = this.summaryInfo[parent].startDate;
+                totals.endDate = this.summaryInfo[parent].endDate;
+            }
 
             var percentDoneByStoryCount = totals.totalCount > 0 ? totals.totalAcceptedCount/totals.totalCount : 0,
                 percentDoneByPlanEstimate = totals.totalPlanEstimate > 0 ? totals.totalAcceptedPlanEstimate/totals.totalPlanEstimate : 0;
 
-            this.logger.log('updateAdditionalFields results', percentDoneByPlanEstimate,percentDoneByStoryCount,totals.projects);
-
             r.set('PercentDoneByStoryCount',percentDoneByStoryCount);
             r.set('PercentDoneByStoryPlanEstimate',percentDoneByPlanEstimate);
             r.set('Teams', totals.projects);
+            r.set('_summary', totals);
         }
-
+        this.down('rallygridboard').getGridOrBoard().getStore().resumeEvents();
     },
     processChildren: function(topLevelStoryRecords, childRecords){
         this.logger.log('processChildren', childRecords)
+
         if (!childRecords || childRecords.length == 0){
-            this.updateAdditionalFields(topLevelStoryRecords,this.childHash || {});
+            this.updateAdditionalFields(topLevelStoryRecords);
             return;
         }
 
-        var childHash = this.childHash || {};
+        var childHash = {};
+
         for (var i=0; i<childRecords.length; i++){
             var child = childRecords[i].getData(),
                 parent = (child.PortfolioItem && child.PortfolioItem.ObjectID) ||
@@ -199,11 +219,23 @@ Ext.define("story-rollup-custom-list", {
                 childHash[parent].push(child);
             }
         }
-        this.childHash = childHash;
 
         this.logger.log('processChildren', childHash, topLevelStoryRecords);
+        var startDateField = this.getStartDateField(),
+            endDateField = this.getEndDateField();
 
-        this.updateAdditionalFields(topLevelStoryRecords,childHash);
+        for (var i=0; i< topLevelStoryRecords.length; i++) {
+            var r = topLevelStoryRecords[i],
+                oid = r.get('ObjectID'),
+                startDate = r.get(startDateField),
+                endDate = r.get(endDateField);
+
+            this.summaryInfo[oid] = this.getChildTotals(r, childHash);
+            this.summaryInfo[oid].startDate = startDate;
+            this.summaryInfo[oid].endDate = endDate;
+
+        }
+        this.updateAdditionalFields(topLevelStoryRecords);
 
     },
     getChildTotals: function(record, childHash){
@@ -217,7 +249,8 @@ Ext.define("story-rollup-custom-list", {
             totalAcceptedCount = 0,
             projects = [],
             tfsLinkField = this.getTFSLinkField(),
-            tfsPrefix = this.getTFSTeamPrefix();
+            tfsPrefix = this.getTFSTeamPrefix(),
+            unestimatedLeafStories = 0;
 
         if (children.length > 0) {
             Ext.Array.each(children, function (c) {
@@ -228,24 +261,30 @@ Ext.define("story-rollup-custom-list", {
 
                 if (childHash[c.ObjectID]) {
                     totals = this.getChildTotals(c, childHash, acceptedScheduleStates);
+                    this.summaryInfo[c.ObjectID] = totals;
                 } else {
                     var isAccepted = Ext.Array.contains(acceptedScheduleStates, c.ScheduleState),
                         acceptedPlanEstimate = isAccepted && c.PlanEstimate || 0,
                         acceptedTotal = isAccepted && 1 || 0,
                         isTFS = c[tfsLinkField],
-                        projectName = c.Project && c.Project.Name;
+                        projectName = c.Project && c.Project.Name,
+                        unestimated = !c.PlanEstimate && (c.PlanEstimate !== 0);
 
                     if (isTFS){
                         projectName = tfsPrefix + projectName;
                     }
+
                     totals = {
+                        unestimatedLeafStories: unestimated && 1 || 0,
                         totalPlanEstimate: c.PlanEstimate || 0,
                         totalAcceptedPlanEstimate: acceptedPlanEstimate,
                         totalCount: 1,
                         totalAcceptedCount: acceptedTotal,
                         projects: [projectName]
                     };
+                    this.summaryInfo[c.ObjectID] = totals;
                 }
+                unestimatedLeafStories += totals.unestimatedLeafStories;
                 totalPlanEstimate += totals.totalPlanEstimate;
                 totalAcceptedPlanEstimate += totals.totalAcceptedPlanEstimate;
                 totalCount += totals.totalCount;
@@ -257,13 +296,24 @@ Ext.define("story-rollup-custom-list", {
             var recordData = record.ObjectID ? record : record.getData(),
                 isAccepted = Ext.Array.contains(acceptedScheduleStates, recordData.ScheduleState),
                 acceptedPlanEstimate = isAccepted && recordData.PlanEstimate || 0,
-                acceptedTotal = isAccepted && 1 || 0;
+                acceptedTotal = isAccepted && 1 || 0,
+                unestimatedCount = (!recordData.PlanEstimate && (recordData.PlanEstimate !== 0) && 1) || 0;
 
+            unestimatedLeafStories = unestimatedCount;
             totalPlanEstimate = recordData.PlanEstimate || 0;
             totalAcceptedPlanEstimate = acceptedPlanEstimate;
             totalCount = 1;
             totalAcceptedCount = acceptedTotal;
             projects = [recordData.Project && recordData.Project.Name]
+
+            this.summaryInfo[recordData.ObjectID] = {
+                unestimatedLeafStories: unestimatedCount,
+                totalPlanEstimate: recordData.PlanEstimate || 0,
+                totalAcceptedPlanEstimate: acceptedPlanEstimate,
+                totalCount: 1,
+                totalAcceptedCount: acceptedTotal,
+                projects: [recordData.Project && recordData.Project.Name]
+            }
         }
 
 
@@ -272,7 +322,8 @@ Ext.define("story-rollup-custom-list", {
             totalAcceptedPlanEstimate: totalAcceptedPlanEstimate,
             totalCount: totalCount,
             totalAcceptedCount: totalAcceptedCount,
-            projects: projects
+            projects: projects,
+            unestimatedLeafStories: unestimatedLeafStories
         };
     },
     showErrorNotification: function(msg){
@@ -401,6 +452,28 @@ Ext.define("story-rollup-custom-list", {
                 }
                 return false;
             }
+        },{
+            xtype: 'rallyfieldcombobox',
+            model: 'hierarchicalrequirement',
+            name: 'storyStartDateField',
+            fieldLabel: 'Story StartDate Field',
+            labelAlign: 'right',
+            labelWidth: 100,
+            _isNotHidden: function(field){
+                return (!field.readOnly && field.attributeDefinition && field.attributeDefinition.AttributeType === 'DATE');
+            }
+
+        },{
+            xtype: 'rallyfieldcombobox',
+            model: 'hierarchicalrequirement',
+            name: 'storyEndDateField',
+            fieldLabel: 'Story EndDate Field',
+            labelAlign: 'right',
+            labelWidth: 100,
+            _isNotHidden: function(field){
+                return (!field.readOnly && field.attributeDefinition && field.attributeDefinition.AttributeType === 'DATE');
+            }
+
         },{
             xtype: 'textarea',
             fieldLabel: 'Query',

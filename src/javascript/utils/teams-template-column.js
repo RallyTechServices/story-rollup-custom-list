@@ -7,7 +7,7 @@ Ext.define('CArABU.technicalservices.TeamsTemplateColumn', {
     initComponent: function(){
         var me = this;
 
-        Ext.QuickTips.init();
+        Ext.QuickTips.init(true, { hideDelay: 10000});
 
         me.tpl = new Ext.XTemplate('<tpl><div data-qtip="{[this.getTooltip(values)]}" style="cursor:pointer;text-align:right;">{[this.getTeamsText(values)]}</div></tpl>',{
             getTeamsText: function(values){

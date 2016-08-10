@@ -103,16 +103,10 @@ Ext.override(Rally.ui.renderer.RendererFactory, {
         },
         hierarchicalrequirement: {
             percentdonebystorycount: function(field){
-                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountTemplate',{
-                    startDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField,
-                    endDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyEndDateField
-                });
+                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryCountTemplate');
             },
             percentdonebystoryplanestimate: function(field){
-                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEstimateTemplate',{
-                    startDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField,
-                    endDateField: CArABU.technicalservices.StoryRollupCustomListSettings.storyEndDateField
-                });
+                return Ext.create('Rally.ui.renderer.template.progressbar.StoryPercentDoneByStoryPlanEstimateTemplate');
             }
         }
     }
