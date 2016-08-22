@@ -175,8 +175,9 @@ Ext.define("story-rollup-custom-list", {
     },
     updateAdditionalFields: function(records){
         this.logger.log('updateAdditionalFields',records, this.summaryInfo);
-        this.down('rallygridboard').getGridOrBoard().getStore().suspendEvents();
+       // this.down('rallygridboard').getGridOrBoard().getStore().suspendEvents();
 
+        Ext.suspendLayouts();
         for (var i=0; i< records.length; i++){
               var r = records[i],
                   parent = r.get('Parent') && r.get('Parent').ObjectID,
@@ -195,7 +196,8 @@ Ext.define("story-rollup-custom-list", {
             r.set('Teams', totals.projects);
             r.set('_summary', totals);
         }
-        this.down('rallygridboard').getGridOrBoard().getStore().resumeEvents();
+        Ext.resumeLayouts(true);
+       // this.down('rallygridboard').getGridOrBoard().getStore().resumeEvents();
     },
     processChildren: function(topLevelStoryRecords, childRecords){
         this.logger.log('processChildren', childRecords)
