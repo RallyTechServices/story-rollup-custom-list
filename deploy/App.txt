@@ -3,12 +3,12 @@
 <head>
     <title>Story Rollup Custom List</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Aug 09 2016 16:42:16 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 22 2016 13:20:49 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Aug 09 2016 16:42:16 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Aug 22 2016 13:20:49 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 33062903390;
+        var CHECKSUM = 33182884705;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -805,8 +805,9 @@ Ext.define("story-rollup-custom-list", {
     },
     updateAdditionalFields: function(records){
         this.logger.log('updateAdditionalFields',records, this.summaryInfo);
-        this.down('rallygridboard').getGridOrBoard().getStore().suspendEvents();
+       // this.down('rallygridboard').getGridOrBoard().getStore().suspendEvents();
 
+        Ext.suspendLayouts();
         for (var i=0; i< records.length; i++){
               var r = records[i],
                   parent = r.get('Parent') && r.get('Parent').ObjectID,
@@ -825,7 +826,8 @@ Ext.define("story-rollup-custom-list", {
             r.set('Teams', totals.projects);
             r.set('_summary', totals);
         }
-        this.down('rallygridboard').getGridOrBoard().getStore().resumeEvents();
+        Ext.resumeLayouts(true);
+       // this.down('rallygridboard').getGridOrBoard().getStore().resumeEvents();
     },
     processChildren: function(topLevelStoryRecords, childRecords){
         this.logger.log('processChildren', childRecords)
