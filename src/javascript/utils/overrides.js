@@ -112,3 +112,45 @@ Ext.override(Rally.ui.renderer.RendererFactory, {
     }
 
 });
+
+Ext.override(Rally.data.wsapi.TreeStore, {
+    _getChildNodeFilters: function(node) {
+        var parentType = node.self.typePath,
+            childTypes = this._getChildTypePaths([parentType]),
+            parentFieldNames = this._getParentFieldNames(childTypes, parentType);
+        console.log('_getChildNodeFilters', node, this.childFilters, parentType);
+        if (parentFieldNames.length) {
+            var filters =  Rally.data.wsapi.Filter.or(_.map(parentFieldNames, function(parentFieldName) {
+                return {
+                    property: parentFieldName,
+                    operator: '=',
+                    value: node.get('_ref')
+                };
+            }));
+            if (this.childFilters && this.childFilters[parentType]){
+                return [filters.and(this.childFilters[parentType])];
+            }
+            return [filters];
+        }
+        return [];
+    }
+});
+
+Ext.override(Rally.ui.grid.plugin.TreeGridChildPager, {
+    _storeHasMoreChildPages: function(parentRecord) {
+        var loadedCount = this._getLoadedCount(parentRecord);
+        var childPageSize = this.cmp.getStore().getChildPageSize(parentRecord);
+        return parentRecord.get('leafCount') > loadedCount && loadedCount >= childPageSize;
+    }
+});
+
+Ext.override(Rally.ui.grid.TreeView, {
+    _expandHandler: function(node, children){
+        if (this.getTreeStore().getRootNode() !== node && children.length === 0){
+            this.refresh(); //treegrid freaks out when it tries to expand a node that has no children, so force a refresh
+            if (!this.getTreeStore().hasErrors()){
+                Rally.ui.notify.Notifier.showWarning({message:node.get('FormattedID') + ' may have children that are not displayed due to the Feature Query Filter in the App Settings.'});
+            }
+        }
+    },
+});

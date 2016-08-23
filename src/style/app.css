@@ -15,3 +15,10 @@
     margin-right: 5px;
     cursor: pointer;
 }
+
+.settings-message {
+    color: grey;
+    font-family:NotoSans;
+    font-style: italic;
+    font-size: 10pt;
+}

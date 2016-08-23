@@ -15,6 +15,7 @@ Ext.define("story-rollup-custom-list", {
     config: {
         defaultSettings: {
             queryFilter: "",
+            featureQueryFilter: "",
             tfsLinkField: "c_TFSLink",
             storyStartDateField: "c_TeamFeatureStartDate",
             storyEndDateField: "c_TeamFeatureEndDate"
@@ -22,6 +23,7 @@ Ext.define("story-rollup-custom-list", {
     },
 
     acceptedScheduleStates: ['Accepted'],
+    portfolioItemTypes: [],
 
     launch: function() {
         CArABU.technicalservices.StoryRollupCustomListSettings.storyStartDateField = this.getStartDateField();
@@ -72,7 +74,12 @@ Ext.define("story-rollup-custom-list", {
             xtype: 'rallyportfolioitemtypecombobox',
             fieldLabel: "Type"
         });
+        cb.on('ready', this.updatePortfolioItemTypes, this);
         cb.on('select', this.updateView, this);
+    },
+    updatePortfolioItemTypes: function(cb){
+        this.logger.log('updatePortfolioItemTypes', cb.getStore().getRange());
+        this.portfolioItemTypes = Ext.Array.map(cb.getStore().getRange(), function(p){ return p.get('TypePath'); });
     },
     getSelectorBox: function(){
         return this.down('#selector_box');
@@ -90,15 +97,43 @@ Ext.define("story-rollup-custom-list", {
         return this.getSetting('storyStartDateField');
     },
     getInitialFilters: function(){
-        var query = this.getSetting('queryFilter');
+        var query = this.getSetting('queryFilter'),
+            featureFilters = null;
+
+        this.logger.log('getInitialFilters', this.modelNames, this.portfolioItemTypes);
+
+        if (this.isLowestLevel()){
+            //This is the lowest level portfolio item type
+            featureFilters = this.getFeatureFilters();
+        }
+
+        if (query && query.length > 0){
+            var filters = Rally.data.wsapi.Filter.fromQueryString(query);
+            if (featureFilters){
+                filters = filters.and(featureFilters);
+            }
+            return filters;
+        }
+        return featureFilters || [];
+    },
+    getFeatureFilters: function(){
+        var query = this.getSetting('featureQueryFilter');
+
         if (query && query.length > 0){
             var filters = Rally.data.wsapi.Filter.fromQueryString(query);
             return filters;
         }
-        return [];
+        return null;
     },
     getTFSLinkField: function(){
         return this.getSetting('tfsLinkField');
+    },
+    isLowestLevel: function(){
+        var idx = _.indexOf(this.portfolioItemTypes, this.modelNames && this.modelNames[0]);
+        return  (idx === this.portfolioItemTypes.length - 1)
+    },
+    getSecondLevelPortfolioItem: function(){
+        return this.portfolioItemTypes.slice(-2)[0];
     },
     updateView: function(piSelector){
         var piType = piSelector.getRecord() && piSelector.getRecord().get('TypePath');
@@ -112,6 +147,12 @@ Ext.define("story-rollup-custom-list", {
             return;
         }
 
+        var childFilterHash = null;
+        if (!this.isLowestLevel() && this.getFeatureFilters()){
+            childFilterHash = {};
+            childFilterHash[this.getSecondLevelPortfolioItem().toLowerCase()] = this.getFeatureFilters();
+        }
+
         this.modelNames = [piType];
         var fetch = [this.getFeatureName(),'ScheduleState','PlanEstimate'];
         if (this.getTFSLinkField()){ fetch.push(this.getTFSLinkField());}
@@ -121,6 +162,7 @@ Ext.define("story-rollup-custom-list", {
             models: this.modelNames,
             fetch: fetch,
             enableHierarchy: true,
+            childFilters: childFilterHash,
             filters: this.getInitialFilters()
         }).then({
             success: this.buildGridBoard,
@@ -440,6 +482,10 @@ Ext.define("story-rollup-custom-list", {
     },
     getSettingsFields: function(){
         return [{
+            xtype: 'container',
+            padding: 25,
+            html: '<div class="settings-message">The settings below affect the behavior of the report.  The <b>TFS Link field</b> is the field that the report checks to determine if the story is linked to a TFS story.  The <b>Story Start Date</b> and <b>Story End Date</b> fields determine the coloring of the progress bar for the story rollups.  Changing these fields will affect the behavior of the app.</div>'
+        },{
             xtype: 'rallyfieldcombobox',
             model: 'hierarchicalrequirement',
             name: 'tfsLinkField',
@@ -478,8 +524,36 @@ Ext.define("story-rollup-custom-list", {
 
         },{
             xtype: 'textarea',
-            fieldLabel: 'Query',
+            fieldLabel: 'Top Level Query Filter',
             name: 'queryFilter',
+            anchor: '100%',
+            cls: 'query-field',
+            margin: '0 70 0 0',
+            labelAlign: 'right',
+            labelWidth: 100,
+            plugins: [
+                {
+                    ptype: 'rallyhelpfield',
+                    helpId: 194
+                },
+                'rallyfieldvalidationui'
+            ],
+            validateOnBlur: false,
+            validateOnChange: false,
+            validator: function(value) {
+                try {
+                    if (value) {
+                        Rally.data.wsapi.Filter.fromQueryString(value);
+                    }
+                    return true;
+                } catch (e) {
+                    return e.message;
+                }
+            }
+        },{
+            xtype: 'textarea',
+            fieldLabel: 'Program Feature Query Filter',
+            name: 'featureQueryFilter',
             anchor: '100%',
             cls: 'query-field',
             margin: '0 70 0 0',
