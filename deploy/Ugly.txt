@@ -3,10 +3,10 @@
 <head>
     <title>Story Rollup Custom List</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 22 2016 18:22:06 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Aug 23 2016 12:53:37 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 22 2016 18:22:06 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Aug 23 2016 12:53:37 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -47,6 +47,35 @@
     font-family:NotoSans;
     font-style: italic;
     font-size: 10pt;
+}
+
+table .teams {
+    text-align: left;
+    flex: 1;
+}
+table th.teams{
+    font-size: 12px;
+    color: #A9A9A9;
+    font-weight: bolder;
+}
+table .leafStories {
+    text-align: center;
+}
+table th.leafStories {
+    font-size: 12px;
+    color: #A9A9A9;
+    font-weight: bolder;
+}
+
+.story-title {
+    font-size: 12px;
+    color: #F6A900;
+    font-weight: bolder;
+}
+
+.team-cell {
+    cursor:pointer;
+    text-align:right;
 }
     </style>
 

@@ -7,9 +7,7 @@ Ext.define('CArABU.technicalservices.TeamsTemplateColumn', {
     initComponent: function(){
         var me = this;
 
-        Ext.QuickTips.init(true, { hideDelay: 10000});
-
-        me.tpl = new Ext.XTemplate('<tpl><div data-qtip="{[this.getTooltip(values)]}" style="cursor:pointer;text-align:right;">{[this.getTeamsText(values)]}</div></tpl>',{
+        me.tpl = new Ext.XTemplate('<tpl><div class="team-cell">{[this.getTeamsText(values)]}</div></tpl>',{
             getTeamsText: function(values){
                 if (values && values.Teams){
                     if (Ext.isArray(values.Teams)){
@@ -18,26 +16,6 @@ Ext.define('CArABU.technicalservices.TeamsTemplateColumn', {
                     }
                 }
                 return '--';
-            },
-            getTooltip: function(values){
-
-                if (values && values.Teams && Ext.isArray(values.Teams)){
-                    var hash = {};
-                    Ext.Array.each(values.Teams, function(t){
-                        if (!hash[t]){
-                            hash[t] = 0;
-                        }
-                        hash[t]++;
-                    });
-                    var tooltip = "";
-                    Ext.Object.each(hash, function(team, num){
-                        tooltip += Ext.String.format("{0} ({1} leaf stories)<br/>", team, num);
-                    });
-                    return tooltip;
-
-                }
-                return "";
-
             }
 
         });
