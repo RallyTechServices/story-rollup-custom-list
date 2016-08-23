@@ -3,12 +3,12 @@
 <head>
     <title>Story Rollup Custom List</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 22 2016 18:22:05 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Aug 23 2016 12:53:36 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 22 2016 18:22:05 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Aug 23 2016 12:53:36 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 42459189452;
+        var CHECKSUM = 46672925582;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -617,6 +617,71 @@ Ext.define('CArABU.technicalservices.StoryRollupCustomListSettings',{
     storyEndDateField: undefined
 });
 
+Ext.define('CArABU.technicalservices.TeamPopover', {
+    alias: 'widget.teampopover',
+    extend: 'Rally.ui.popover.Popover',
+
+    mixins: [
+        'Rally.Messageable'
+    ],
+
+    cls: 'blocked-reason-popover',
+    width: 400,
+
+    offsetFromTarget:[{x:0, y:-10}, {x:15, y:0}, {x:0, y:10}, {x:0, y:0}],
+    header: false,
+    closable: true,
+
+    config: {
+        record: null
+    },
+
+    constructor: function(config) {
+        Ext.apply(this.config, config);
+
+        this.callParent(arguments);
+
+        var teams = [];
+        var values = config.record && config.record.getData();
+        if (values && values.Teams && Ext.isArray(values.Teams)){
+            var hash = {};
+            Ext.Array.each(values.Teams, function(t){
+                if (!hash[t]){
+                    hash[t] = 0;
+                }
+                hash[t]++;
+            });
+
+            Ext.Object.each(hash, function(team, num){
+                teams.push({team: team, leafStories: num});
+            });
+
+            var data = {
+                teams: teams,
+                formattedID: values.FormattedID,
+                name: values.Name
+            };
+            var tpl = Ext.create('Ext.XTemplate',
+                '<div class="story-title">{formattedID}: {name}</div><br/>',
+                '<table><thead><th class="teams">Teams</th><th class="leafStories"># Leaf Stories</th></thead>',
+                '<tpl for="teams">',
+                '<tr><td class="teams">{team}</td><td class="leafStories">{leafStories}</td></tr>',
+                '</tpl></table>'
+            );
+
+
+            this.add({
+                xtype: 'container',
+                html: tpl.apply(data)
+            });
+        }
+
+
+
+
+    }
+});
+
 Ext.define('CArABU.technicalservices.TeamsTemplateColumn', {
     extend: 'Ext.grid.column.Template',
     alias: ['widget.teamstemplatecolumn'],
@@ -626,9 +691,7 @@ Ext.define('CArABU.technicalservices.TeamsTemplateColumn', {
     initComponent: function(){
         var me = this;
 
-        Ext.QuickTips.init(true, { hideDelay: 10000});
-
-        me.tpl = new Ext.XTemplate('<tpl><div data-qtip="{[this.getTooltip(values)]}" style="cursor:pointer;text-align:right;">{[this.getTeamsText(values)]}</div></tpl>',{
+        me.tpl = new Ext.XTemplate('<tpl><div class="team-cell">{[this.getTeamsText(values)]}</div></tpl>',{
             getTeamsText: function(values){
                 if (values && values.Teams){
                     if (Ext.isArray(values.Teams)){
@@ -637,26 +700,6 @@ Ext.define('CArABU.technicalservices.TeamsTemplateColumn', {
                     }
                 }
                 return '--';
-            },
-            getTooltip: function(values){
-
-                if (values && values.Teams && Ext.isArray(values.Teams)){
-                    var hash = {};
-                    Ext.Array.each(values.Teams, function(t){
-                        if (!hash[t]){
-                            hash[t] = 0;
-                        }
-                        hash[t]++;
-                    });
-                    var tooltip = "";
-                    Ext.Object.each(hash, function(team, num){
-                        tooltip += Ext.String.format("{0} ({1} leaf stories)<br/>", team, num);
-                    });
-                    return tooltip;
-
-                }
-                return "";
-
             }
 
         });
@@ -1104,9 +1147,32 @@ Ext.define("story-rollup-custom-list", {
                     filters: this.getInitialFilters()
                 },
                 columnCfgs: this.getDefaultColumns(),
-                derivedColumns: this.getAdditionalColumns()
+                derivedColumns: this.getAdditionalColumns(),
+                listeners: {
+                    cellclick: this.showTeamPopover,
+                    scope: this
+                }
             },
             height: this.getHeight()
+        });
+    },
+    showTeamPopover: function(grid, td, cellIndex, record, tr, rowIndex, event){
+
+        if (!record.get('Teams')){
+            return;
+        }
+
+        var targetEl = Ext.get(event.getTarget());
+        if (!targetEl || !targetEl.hasCls('team-cell')){
+            return;
+        }
+
+        this.logger.log('showTeamPopover', grid, td, cellIndex, record, tr, rowIndex, targetEl, targetEl.hasCls('team-cell'));
+
+        Ext.create('CArABU.technicalservices.TeamPopover', {
+            target: targetEl,
+            targetSelector: targetEl.id,
+            record: record
         });
     },
     getDefaultColumns: function(){
@@ -1123,7 +1189,8 @@ Ext.define("story-rollup-custom-list", {
     getAdditionalColumns: function(){
         return [{
             xtype: 'teamstemplatecolumn',
-            text: 'Teams'
+            text: 'Teams',
+            cls: 'teams-cell'
         }];
     },
     getOptions: function() {
@@ -1285,6 +1352,35 @@ Ext.define("story-rollup-custom-list", {
     font-family:NotoSans;
     font-style: italic;
     font-size: 10pt;
+}
+
+table .teams {
+    text-align: left;
+    flex: 1;
+}
+table th.teams{
+    font-size: 12px;
+    color: #A9A9A9;
+    font-weight: bolder;
+}
+table .leafStories {
+    text-align: center;
+}
+table th.leafStories {
+    font-size: 12px;
+    color: #A9A9A9;
+    font-weight: bolder;
+}
+
+.story-title {
+    font-size: 12px;
+    color: #F6A900;
+    font-weight: bolder;
+}
+
+.team-cell {
+    cursor:pointer;
+    text-align:right;
 }
     </style>
 

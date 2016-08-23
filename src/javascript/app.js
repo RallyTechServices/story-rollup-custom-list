@@ -433,9 +433,32 @@ Ext.define("story-rollup-custom-list", {
                     filters: this.getInitialFilters()
                 },
                 columnCfgs: this.getDefaultColumns(),
-                derivedColumns: this.getAdditionalColumns()
+                derivedColumns: this.getAdditionalColumns(),
+                listeners: {
+                    cellclick: this.showTeamPopover,
+                    scope: this
+                }
             },
             height: this.getHeight()
+        });
+    },
+    showTeamPopover: function(grid, td, cellIndex, record, tr, rowIndex, event){
+
+        if (!record.get('Teams')){
+            return;
+        }
+
+        var targetEl = Ext.get(event.getTarget());
+        if (!targetEl || !targetEl.hasCls('team-cell')){
+            return;
+        }
+
+        this.logger.log('showTeamPopover', grid, td, cellIndex, record, tr, rowIndex, targetEl, targetEl.hasCls('team-cell'));
+
+        Ext.create('CArABU.technicalservices.TeamPopover', {
+            target: targetEl,
+            targetSelector: targetEl.id,
+            record: record
         });
     },
     getDefaultColumns: function(){
@@ -452,7 +475,8 @@ Ext.define("story-rollup-custom-list", {
     getAdditionalColumns: function(){
         return [{
             xtype: 'teamstemplatecolumn',
-            text: 'Teams'
+            text: 'Teams',
+            cls: 'teams-cell'
         }];
     },
     getOptions: function() {
