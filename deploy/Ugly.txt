@@ -3,10 +3,10 @@
 <head>
     <title>Story Rollup Custom List</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 22 2016 13:20:49 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 22 2016 18:22:06 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 22 2016 13:20:49 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Aug 22 2016 18:22:06 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -40,6 +40,13 @@
     margin-top: 25px;
     margin-right: 5px;
     cursor: pointer;
+}
+
+.settings-message {
+    color: grey;
+    font-family:NotoSans;
+    font-style: italic;
+    font-size: 10pt;
 }
     </style>
 
