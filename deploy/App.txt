@@ -3,12 +3,12 @@
 <head>
     <title>Story Rollup Custom List</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Aug 23 2016 12:53:36 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Aug 26 2016 16:11:56 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Aug 23 2016 12:53:36 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Fri Aug 26 2016 16:11:56 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 46672925582;
+        var CHECKSUM = 46672922316;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
