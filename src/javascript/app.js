@@ -75,11 +75,16 @@ Ext.define("story-rollup-custom-list", {
             fieldLabel: "Type"
         });
         cb.on('ready', this.updatePortfolioItemTypes, this);
-        cb.on('select', this.updateView, this);
+
     },
     updatePortfolioItemTypes: function(cb){
         this.logger.log('updatePortfolioItemTypes', cb.getStore().getRange());
         this.portfolioItemTypes = Ext.Array.map(cb.getStore().getRange(), function(p){ return p.get('TypePath'); });
+        cb.on('select', this.updateView, this);
+        if (cb.getValue()){
+            this.updateView(cb);
+        }
+
     },
     getSelectorBox: function(){
         return this.down('#selector_box');
@@ -118,9 +123,10 @@ Ext.define("story-rollup-custom-list", {
     },
     getFeatureFilters: function(){
         var query = this.getSetting('featureQueryFilter');
-
+        this.logger.log('getFeatureFilters', query, query.length);
         if (query && query.length > 0){
             var filters = Rally.data.wsapi.Filter.fromQueryString(query);
+            this.logger.log('getFeatureFilters', filters.toString());
             return filters;
         }
         return null;
@@ -130,6 +136,7 @@ Ext.define("story-rollup-custom-list", {
     },
     isLowestLevel: function(){
         var idx = _.indexOf(this.portfolioItemTypes, this.modelNames && this.modelNames[0]);
+        this.logger.log('isLowestLevel', idx, this.modelNames, this.portfolioItemTypes);
         return  (idx === this.portfolioItemTypes.length - 1)
     },
     getSecondLevelPortfolioItem: function(){
@@ -158,6 +165,8 @@ Ext.define("story-rollup-custom-list", {
         if (this.getTFSLinkField()){ fetch.push(this.getTFSLinkField());}
         if (this.getStartDateField()){ fetch.push(this.getStartDateField());}
         if (this.getEndDateField()){ fetch.push(this.getEndDateField());}
+
+        this.logger.log('updateView', childFilterHash, this.isLowestLevel(), this.getFeatureFilters());
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: this.modelNames,
             fetch: fetch,

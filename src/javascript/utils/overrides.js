@@ -118,7 +118,7 @@ Ext.override(Rally.data.wsapi.TreeStore, {
         var parentType = node.self.typePath,
             childTypes = this._getChildTypePaths([parentType]),
             parentFieldNames = this._getParentFieldNames(childTypes, parentType);
-        console.log('_getChildNodeFilters', node, this.childFilters, parentType);
+        //console.log('_getChildNodeFilters', node, this.childFilters, parentType);
         if (parentFieldNames.length) {
             var filters =  Rally.data.wsapi.Filter.or(_.map(parentFieldNames, function(parentFieldName) {
                 return {
